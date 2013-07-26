@@ -1,4 +1,6 @@
 wcb-ink
 =======
 
-WaterColorBot extensions for Inkscape
+This repository will host the WaterColorBot extensions for Inkscape.  
+
+http://watercolorbot.com
