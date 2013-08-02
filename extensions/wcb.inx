@@ -1,0 +1,258 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
+  <_name>WaterColorBot Control</_name>
+  <id>command.evilmadscientist.wcb.plot_reva32</id>
+  <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
+  <dependency type="executable" location="extensions">wcb.py</dependency>
+  <dependency type="executable" location="extensions">inkex.py</dependency>
+  <param name="tab" type="notebook">
+  
+    <page name="splash" _gui-text="Paint">
+      <_param name="splashpage" type="description" xml:space="preserve">
+Welcome to the WaterColorBot interface!
+
+1. Make sure that the WaterColorBot Carriage
+    is in the START (upper-left) corner.
+
+2.Press 'Apply' to begin plotting!
+
+Need help? Visit http://watercolorbot.com/
+</_param>
+    </page>
+
+    <page name='setup' _gui-text='Setup'>
+
+      <_param name="instructions_setup" type="description" xml:space="preserve">
+WaterColorBot: Basic Setup
+</_param>
+      <param name="penUpPosition" type="int" min="0" max="100"
+	     _gui-text="          Brush up position, 0-100%:">60</param>
+      <param name="penDownPosition" type="int" min="0" max="100"
+	     _gui-text="          Brush down position, 0-100%:">21</param>
+      <_param name="instructions_setup2" type="description"
+	      xml:space="preserve">
+</_param>
+      <param name="setupType" type="optiongroup" appearance=""
+	     _gui-text="          Action on 'Apply': ">
+	<_option value="align-mode"     >Raise Brush, turn off motors</_option>	
+	<_option value="toggle-pen"     >Toggle Brush up/down</_option>
+      </param>
+      <_param name="instructions_setup3" type="description"
+	      xml:space="preserve">
+- Raise brush and turn off stepper motors
+  to move carriage to the START position
+  (i.e., the upper left corner).
+
+- Raise and lower brush to check the
+  Brush-up and Brush-down positions.
+
+</_param>
+    </page>
+
+    <page name='timing' _gui-text='Timing'>
+      <param name="penDownSpeed" type="int" min="1" max="250"
+	   _gui-text="          Speed when brush is down (%):">50</param>	
+      <param name="penUpSpeed" type="int" min="1" max="250"
+	   _gui-text="          Speed when brush is up (%):">60</param>
+	   
+      <param name="ServoUpSpeed" type="int" min="1" max="1600"
+	   _gui-text="          Brush raising speed (%/s):">120</param>
+      <param name="penUpDelay" type="int" min="1" max="5000"
+	   _gui-text="          Delay after raising brush (ms):">200</param>
+      <param name="ServoDownSpeed" type="int" min="1" max="1600"
+	   _gui-text="          Brush lowering speed (%/s):">100</param>
+      <param name="penDownDelay" type="int" min="1" max="5000"
+	   _gui-text="          Delay after lowering brush (ms):">400</param>
+      <_param name="help_timing" type="description">
+(Press 'Apply' to save settings.)
+</_param>
+    </page>
+
+    <page name='options' _gui-text='Options'>
+      <param name="revMotor1" type="boolean"
+           _gui-text="          Reverse motion of Motor 1 (X):">false</param>	
+      <param name="revMotor2" type="boolean"
+           _gui-text="          Reverse motion of Motor 2 (Y):">false</param> 
+      <param name="reInkDist" type="float" min="0" max="500" 
+           _gui-text="          Re-ink distance (inches):">10.0</param> 
+<!--
+      <param name="reInkRand" type="int" min="0" max="100"
+           _gui-text="          Re-ink distance randomness (0-100%)*:">0</param>
+-->
+      <param name="smoothness" type="float" min="0" 
+           _gui-text="          Curve smoothing (lower for more):">.2</param>
+           
+      <param name="resolution" type="optiongroup" appearance="minimal"
+	     _gui-text="          Motor Resolution:">
+	<_option value="2">Normal, ~450 DPI</_option>
+	<_option value="1">Super, ~900 DPI</_option>
+	<_option value="3">Low, ~225 DPI</_option>
+      </param>
+           
+      <_param name="help_options" type="description">      
+(Press 'Apply' to save settings.)
+</_param>
+    </page>
+    <page name='wcbModes' _gui-text='Mode'>
+
+
+ <_param name="instr_modes" type="description">
+ WaterColorBot Painting Mode 
+</_param>  
+
+    <param name="paintMode" type="optiongroup" appearance="minimal"
+	     _gui-text="   Mode:">
+	<_option value="wc" >WaterColor (AutoChange, Pre-Dip, Re-Ink)</_option>
+	<_option value="wc-dip">WaterColor + Post-Dip </_option>
+	<_option value="tempera">Tempera (AutoChange, Re-Ink)</_option>
+	<_option value="wc-pen">WaterColor Pencil (Re-Ink w/ Water)</_option>
+	<_option value="dip-pen" >Dip Pen (Re-Ink only)</_option>
+	<_option value="pencil" >Pencil (No ink, no water)</_option>
+	<_option value="man-mode" >Manual Config (see below)</_option> 
+      </param>
+
+ <_param name="instr_modes2" type="description" xml:space="preserve">
+ 
+The following settings are used only when 
+ "Manual Config" mode is selected above:
+</_param>  
+
+           
+      <param name="autoChange" type="boolean"
+           _gui-text="       [AutoChange] between colors w/ water wash">true</param> 
+      <param name="reInkEnable" type="boolean"
+           _gui-text="       [Re-Ink] brush after given distance">true</param>      
+      <param name="PreDipEnable" type="boolean"
+           _gui-text="       [Pre-Dip] brush in water before re-inking">false</param>	
+      <param name="PostDipEnable" type="boolean"
+           _gui-text="       [Post-Dip] brush in water after re-inking">false</param>	
+      <param name="ReWetOnly" type="boolean"
+           _gui-text="       [Re-Ink w/ Water] instead of paint">false</param>	
+                            
+      <_param name="help_modes" type="description">
+(Press 'Apply' to save settings.)
+</_param>
+    </page>
+	
+    <page name="manual" _gui-text="Manual">
+      <_param name="instructions_manual" type="description"
+	      xml:space="preserve">
+WaterColorBot Manual Control
+
+You can use this frame to send "manual" commands
+to the WaterColorBot: Walk the stepper motors, raise
+or lower the brush, enable or disable the motors,
+or check the circuit board (EBB) firmware version.
+</_param>
+
+      <param name="manualType" type="optiongroup" appearance="minimal"
+	     _gui-text="               Command: ">
+	<_option value="none"           >- Select -</_option>
+<!-- 	<_option value="Get-paint"      >Get Paint (starting @ home)</_option>  -->
+	<_option value="raise-pen"      >Raise the Brush</_option>
+	<_option value="lower-pen"      >Lower the Brush</_option>
+	<_option value="walk-x-motor" >Walk Motor 1 (X)</_option>
+	<_option value="walk-y-motor" >Walk Motor 2 (Y)</_option>
+	<_option value="enable-motors"  >Enable Motors</_option>
+	<_option value="disable-motors" >Disable Motors</_option> 
+	<_option value="wash-brush"     >Wash Brush (from home corner)</_option>
+	<_option value="version-check"  >Check EBB Version</_option>
+      </param>
+
+      <param name="WalkDistance" type="float" min="-11" max="11" 
+             _gui-text="Walk distance in inches (positive or negative):">1.00</param>
+             
+<!--
+      <param name="manualType" type="optiongroup" appearance="minimal"
+	     _gui-text="Paint color to get: "> 
+	<_option value="0" >0 (top)</_option>
+	<_option value="1" >1</_option> 
+	<_option value="2" >2</_option>
+	<_option value="3" >3</_option>
+	<_option value="4" >4</_option>
+	<_option value="5" >5</_option>
+	<_option value="6" >6</_option>
+	<_option value="7" >7</_option>  
+      </param>     
+-->        
+             
+      <_param name="instructions_manual2" type="description"
+	      xml:space="preserve">
+	      Press 'Apply' to execute the command.
+</_param>
+    </page>
+
+    <page name="resume" _gui-text="Resume">
+      <_param name="instructions_resume" type="description"
+	      xml:space="preserve">
+	      
+*** NOT YET IMPLEMENTED/TESTED ***
+	      
+To pause a plot in progress, press the "PRG" 
+button on the EBB circuit board. After pausing,
+you can change settings or perform any
+manual adjustments that are needed.
+
+To resume plotting-- or to cancel and return
+home --press 'Apply' with this tab selected.   
+
+Plot progress is stored in the inkscape file;
+if you need to quit inkscape and resume later, 
+be sure to save the document first.
+
+
+</_param>
+      <param name="cancelOnly" type="boolean"
+	     _gui-text="Cancel and return home only:">false</param> 
+    </page>		
+
+    <page name="layers" _gui-text="Layers">
+      <_param name="instructions_layer" type="description" xml:space="preserve">
+Normally, we plot paths from all layers.  
+You can also choose to plot a single layer 
+or group of layers, for example to plot only a
+single color of paint.
+
+Pressing 'Apply' from this frame will plot
+only layers whose names begin with the 
+selected number, which can be up to 100.
+
+Colors are assigned by layer. 
+Layer 1: Top color.  Layer 8: Bottom color.
+
+(Typically, black is at the top, brown is at
+ the bottom, but color sets may vary.)
+
+</_param>
+      <param name="layernumber" type="int" min="0" max="100"
+	     _gui-text="   Plot only layers beginning with: ">1</param>
+    </page>			
+
+    <page name="Help" _gui-text="*">
+      <_param name="instructions_general" type="description"
+	      xml:space="preserve">
+WaterColorBot Control Inkscape extension 
+Release 0.1.1, dated 7/13/2013
+
+*EBB Firmware 1.96 or newer required for certain
+ functions. 
+
+Known issues:
+* "Cancel" function does not work while plotting.
+  (This is due to a known bug in Inkscape.)
+</_param>
+    </page>
+  </param>
+
+  <effect needs-live-preview="false" needs-document="no">
+    <object-type>all</object-type>
+    <effects-menu>
+      <submenu _name="WaterColorBot"/>
+    </effects-menu>
+  </effect>
+
+  <script>
+    <command reldir="extensions" interpreter="python">wcb.py</command>
+  </script>
+
+</inkscape-extension>
