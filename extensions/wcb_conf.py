@@ -62,7 +62,7 @@ WashDelta: Maximum peak-to-peak excursion of brush while washing in water.
 '''
 
 WashDelta = (0,80)
-WashCycles = 1
+WashCycles = 2
 
 '''
 Water Dip Details:
@@ -86,7 +86,7 @@ InkReDelta: Excursion for re-inking brush
 '''
 
 InkDelta = (80,55)
-InkCycles = 2
+InkCycles = 1
 
 InkReCycles = 1
 InkReDelta = (25,20)

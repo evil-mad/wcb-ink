@@ -603,6 +603,9 @@ class WCB( inkex.Effect ):
 						self.CleanBrush()
 						self.MoveToPaint(0)
 						self.PaintSwirl(wcb_conf.InkCycles, wcb_conf.InkDelta[0], wcb_conf.InkDelta[1]) 
+						if (self.options.PostDipEnable):
+							self.MoveToWater(0)
+							self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])						
 					else: #using paint but not using water	
 						self.MoveToPaint(0)
 						self.PaintSwirl(wcb_conf.InkCycles, wcb_conf.InkDelta[0], wcb_conf.InkDelta[1]) 				
@@ -614,24 +617,21 @@ class WCB( inkex.Effect ):
 		self.ReInkingNow = True
 		returnToX = self.fCurrX # Save current position, to return to.
 		returnToY = self.fCurrY # Save current position, to return to.
-		BrushDipped = False  
 		
 		if (self.options.PreDipEnable):
 			self.MoveToWater(0)
 			self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])   
-			BrushDipped = True
+			
 		if ((self.options.ReWetOnly) or (self.BrushColor == 0)):
-			if ((BrushDipped == False) or self.manConfMode):
-				self.MoveToWater(0)
-				self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])   
-				BrushDipped = True			
+			self.MoveToWater(0)
+			self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])   
 		else: 
 			self.MoveToPaint( self.BrushColor - 1 )  
-			self.PaintSwirl(wcb_conf.InkReCycles, wcb_conf.InkReDelta[0], wcb_conf.InkReDelta[1])    
+			self.PaintSwirl(wcb_conf.InkReCycles, wcb_conf.InkReDelta[0], wcb_conf.InkReDelta[1])
+			
 		if (self.options.PostDipEnable):
-			if ((BrushDipped == False) or self.manConfMode):
-				self.MoveToWater(0)
-				self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
+			self.MoveToWater(0)
+			self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
 							
 		self.MoveToXY(returnToX, returnToY)		
 		self.penDown() 
