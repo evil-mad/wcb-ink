@@ -256,10 +256,10 @@ class WCB( inkex.Effect ):
 			dest="WalkDistance", default=1,
 			help="Distance for manual walk" )			
 			
-		self.OptionParser.add_option( "--cancelOnly",
-			action="store", type="inkbool",
-			dest="cancelOnly", default=False,
-			help="Cancel plot and return home only (for resume)." )	
+		self.OptionParser.add_option( "--resumeType",
+			action="store", type="string",
+			dest="resumeType", default="controls",
+			help="The active option when Apply was pressed" )			
 			
 		self.OptionParser.add_option( "--layernumber",
 			action="store", type="int",
@@ -336,7 +336,6 @@ class WCB( inkex.Effect ):
 			self.setPaintingMode()
 			self.plotToWCB()
 
-
 		elif self.options.tab == '"resume"':
 			self.WCBOpenSerial()
 			self.setPaintingMode()
@@ -344,8 +343,27 @@ class WCB( inkex.Effect ):
 			self.resumePlotSetup()
 			if self.resumeMode:
 				self.plotToWCB()
-			elif ( self.options.cancelOnly ):
-				pass
+			elif ( self.options.resumeType == "justGoHome" ):
+				if self.serialPort is None:
+					return
+				self.ServoSetup()
+				self.penUp() 
+				self.sendEnableMotors() #Set plotting resolution 
+				self.fSpeed = self.options.penUpSpeed
+
+				self.fCurrX = self.svgTotalDeltaX 
+				self.fCurrY = self.svgTotalDeltaY
+# 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
+# 				inkex.errormsg('self.fCurrY: ' + str(self.fCurrY)) 
+				self.fX = 0
+				self.fY = 0
+				
+				self.plotLineAndTime(self.fX, self.fY) 
+				
+				self.svgTotalDeltaX = self.fX
+				self.svgTotalDeltaY = self.fY
+#  				inkex.errormsg('self.fX: ' + str(self.fX)) 
+#  				inkex.errormsg('self.fY: ' + str(self.fY)) 
 			else:
 				inkex.errormsg( gettext.gettext( "Truly sorry, there does not seem to be any in-progress plot to resume." ) )
 
@@ -379,6 +397,7 @@ class WCB( inkex.Effect ):
 	def CheckSVGforWCBData( self ):
 		self.svgDataRead = False
 		self.recursiveWCBDataScan( self.svg )
+# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
 		if ( not self.svgDataRead ):    #if there is no WCB data, add some:
 			WCBlayer = inkex.etree.SubElement( self.svg, 'WCB' )
 			WCBlayer.set( 'serialport', '' )
@@ -388,6 +407,10 @@ class WCB( inkex.Effect ):
 			WCBlayer.set( 'lastpathnc', str( 0 ) )
 			WCBlayer.set( 'totaldeltax', str( 0 ) )
 			WCBlayer.set( 'totaldeltay', str( 0 ) )
+			
+# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
+# 		inkex.errormsg('self.svgTotalDeltaX: ' + str(self.svgTotalDeltaX)) 
+# 		inkex.errormsg('self.svgTotalDeltaY: ' + str(self.svgTotalDeltaY)) 
 
 	def recursiveWCBDataScan( self, aNodeList ):
 		if ( not self.svgDataRead ):
@@ -395,24 +418,21 @@ class WCB( inkex.Effect ):
 				if node.tag == 'svg':
 					self.recursiveWCBDataScan( node )
 				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
-					self.svgSerialPort = node.get( 'serialport' )
-					self.svgLayer = int( node.get( 'layer' ) )
-					self.svgNodeCount = int( node.get( 'node' ) )
-
 					try:
+						self.svgSerialPort = node.get( 'serialport' )
+						self.svgLayer = int( node.get( 'layer' ) )
+						self.svgNodeCount = int( node.get( 'node' ) )
 						self.svgLastPath = int( node.get( 'lastpath' ) )
 						self.svgLastPathNC = int( node.get( 'lastpathnc' ) )
-						self.svgTotalDeltaX = int( node.get( 'totaldeltax' ) )
-						self.svgTotalDeltaY = int( node.get( 'totaldeltay' ) )
+						self.svgTotalDeltaX = float( node.get( 'totaldeltax' ) )
+						self.svgTotalDeltaY = float( node.get( 'totaldeltay' ) ) 
 						self.svgDataRead = True
 					except:
-						node.set( 'lastpath', str( 0 ) )
-						node.set( 'lastpathnc', str( 0 ) )
-						node.set( 'totaldeltax', str( 0 ) )
-						node.set( 'totaldeltay', str( 0 ) )
-						self.svgDataRead = True
+						pass
 
 	def UpdateSVGWCBData( self, aNodeList ):
+# 		inkex.errormsg('self.svgTotalDeltaX: ' + str(self.svgTotalDeltaX)) 
+#  		inkex.errormsg('self.svgTotalDeltaY: ' + str(self.svgTotalDeltaY)) 
 		if ( not self.svgDataRead ):
 			for node in aNodeList:
 				if node.tag == 'svg':
@@ -423,10 +443,12 @@ class WCB( inkex.Effect ):
 					node.set( 'node', str( self.svgNodeCount ) )
 					node.set( 'lastpath', str( self.svgLastPath ) )
 					node.set( 'lastpathnc', str( self.svgLastPathNC ) )
-					node.set( 'totaldeltax', str( self.svgTotalDeltaX ) )
-					node.set( 'totaldeltay', str( self.svgTotalDeltaY ) )
+					node.set( 'totaldeltax', str( (self.svgTotalDeltaX / self.stepsPerPx) ) )
+					node.set( 'totaldeltay', str( (self.svgTotalDeltaY / self.stepsPerPx) ) )
 					self.svgDataRead = True
-
+					
+					
+					
 	def resumePlotSetup( self ):
 		self.LayerFound = False
 		if ( self.svgLayer < 101 ) and ( self.svgLayer >= 0 ):
@@ -437,25 +459,29 @@ class WCB( inkex.Effect ):
 		elif ( self.svgLayer == 12345 ):  # Plot all layers 
 			self.PrintFromLayersTab = False
 			self.plotCurrentLayer = True
-			self.LayerFound = True
+			self.LayerFound = True 	
 		if ( self.LayerFound ):
 			if ( self.svgNodeCount > 0 ):
 				self.nodeTarget = self.svgNodeCount
 				self.resumeMode = True
-				if ( self.options.cancelOnly ):
+				
+				if self.options.resumeType == "ResumeFromHome":
+					self.penUp()
+				elif self.options.resumeType == "ResumeInSitu":
+					self.penUp()		
+				else:  #i.e., self.options.resumeType == "justGoHome":  
 					self.resumeMode = False
-					self.fCurrX = self.svgTotalDeltaX
-					self.fCurrY = self.svgTotalDeltaY
-					self.fX = wcb_conf.F_StartPos_X
-					self.fY = wcb_conf.F_StartPos_Y
-					self.plotLineAndTime(self.fX, self.fY)
-					self.penUp()   #Always end with pen-up
-					self.svgLayer = 0
-					self.svgNodeCount = 0
-					self.svgLastPath = 0
-					self.svgLastPathNC = 0
-					self.svgTotalDeltaX = 0
-					self.svgTotalDeltaY = 0
+				
+# 					self.fX = wcb_conf.F_StartPos_X
+# 					self.fY = wcb_conf.F_StartPos_Y
+# 					self.plotLineAndTime(self.fX, self.fY)
+# 					self.penUp()   #Always end with pen-up
+# 					self.svgLayer = 0
+# 					self.svgNodeCount = 0
+# 					self.svgLastPath = 0
+# 					self.svgLastPathNC = 0
+# 					self.svgTotalDeltaX = 0
+# 					self.svgTotalDeltaY = 0
 
 	def setupCommand( self ):
 		"""Execute commands from the "setup" tab"""
@@ -471,7 +497,6 @@ class WCB( inkex.Effect ):
 
 		elif self.options.setupType == "toggle-pen":
 			self.doCommand( 'TP\r' )		#Toggle pen
-
 
 	def manualCommand( self ):
 		"""Execute commands from the "manual" tab"""
@@ -531,9 +556,10 @@ class WCB( inkex.Effect ):
 				self.fSpeed = self.options.penUpSpeed
 				
  			self.sendEnableMotors() #Set plotting resolution 
- 			
+ 			self.fCurrX = 0
+ 			self.fCurrY = 0
 			self.fX = nDeltaX * 90  #Note: Walking motors is STRICTLY RELATIVE TO INITIAL POSITION.
-			self.fY = nDeltaY * 90  #fCurrX and fCurrY are set previously, *to zero* before this point.
+			self.fY = nDeltaY * 90  
 			self.plotLineAndTime(self.fX, self.fY ) 
 
 
@@ -735,8 +761,7 @@ class WCB( inkex.Effect ):
 				self.fX = self.ptFirst[0]
 				self.fY = self.ptFirst[1]
 				#self.penUp()
-				self.nodeCount = self.nodeTarget    # enablesfpx return-to-home only option
-# 				self.plotLineAndTime()
+				self.nodeCount = self.nodeTarget    # enablesfpx return-to-home only option 
 				self.plotLineAndTime(self.fX, self.fY ) 
 			#inkex.errormsg('Final node count: ' + str(self.svgNodeCount))  #Node Count - Debug option
 			if ( not self.bStopped ):
@@ -1272,7 +1297,7 @@ class WCB( inkex.Effect ):
 		nDeltaX = int (round(xTemp)) # Number of motor steps required
 		nDeltaY = int (round(yTemp)) 
 		 
-		self.xErr = xTemp - float(nDeltaX)  # Keep track of rounding errors, so that they do not build up.
+		self.xErr = xTemp - float(nDeltaX)  # Keep track of rounding errors, so that they do not accumulate.
 		self.yErr = yTemp - float(nDeltaY)
 		
 		if self.bPenIsUp:
@@ -1306,10 +1331,13 @@ class WCB( inkex.Effect ):
 			
 				xd = 0
 				yd = 0
-				if ( nTime > 250 ):
-					xd = int( math.floor( ( 250.0 * nDeltaX ) / nTime ) )
-					yd = int( math.floor( ( 250.0 * nDeltaY ) / nTime ) )
-					td = int( 250 )
+				
+				maxSegmentDuration = 250.0  # Maximum time to spend painting a given segment
+				
+				if ( nTime > maxSegmentDuration ):
+					xd = int( math.floor( ( maxSegmentDuration * nDeltaX ) / nTime ) )
+					yd = int( math.floor( ( maxSegmentDuration * nDeltaY ) / nTime ) )
+					td = int( maxSegmentDuration )
 				else:
 					xd = nDeltaX
 					yd = nDeltaY
