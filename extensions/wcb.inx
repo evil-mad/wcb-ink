@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
   <_name>WaterColorBot Control</_name>
-  <id>command.evilmadscientist.wcb.plot_reva33</id>
+  <id>command.evilmadscientist.wcb.plot_reva34</id>
   <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
   <dependency type="executable" location="extensions">wcb.py</dependency>
   <dependency type="executable" location="extensions">inkex.py</dependency>
@@ -184,9 +184,8 @@ or check the circuit board (EBB) firmware version.
 
     <page name="resume" _gui-text="Resume">
       <_param name="instructions_resume" type="description"
-	      xml:space="preserve">
-	      
-*** NOT YET IMPLEMENTED/TESTED ***
+	      xml:space="preserve"> 
+*** NOT YET TESTED ***
 	      
 To pause a plot in progress, press the "PRG" 
 button on the EBB circuit board. After pausing,
@@ -200,8 +199,8 @@ Plot progress is stored in the inkscape file;
 if you need to quit inkscape and resume later, 
 be sure to save the document first.
 
-
-
+You can resume directly where you paused, or
+after using the Return to Home Corner command.
     </_param>
 
 <!--
@@ -211,9 +210,8 @@ be sure to save the document first.
 	     
     <param name="resumeType" type="optiongroup" appearance=""
 	     _gui-text="  Action on 'Apply': ">
-    	<_option value="justGoHome" >Move Carriage to Home Corner (only)</_option>	
-    	<_option value="ResumeInSitu" >Resume (From location where paused)</_option>
-    	<_option value="ResumeFromHome" >Resume (From Home Corner)</_option>
+    	<_option value="ResumeNow" >Resume (From Home or Where Paused)</_option>
+    	<_option value="justGoHome">Return to Home Corner (only)</_option>	
           </param>	      
 	     
     </page>		
@@ -244,7 +242,7 @@ Layer 1: Top color.  Layer 8: Bottom color.
       <_param name="instructions_general" type="description"
 	      xml:space="preserve">
 WaterColorBot Control Inkscape extension 
-Release A33, dated 8/5/2013
+Release A34, dated 8/6/2013
 
 *EBB Firmware 1.96 or newer required for certain
  functions. 
@@ -252,7 +250,6 @@ Release A33, dated 8/5/2013
 Known issues:
 * "Cancel" function does not work while plotting.
   (This is due to a known bug in Inkscape.)
-* "Resume" capability not yet implemented.
 * Nothing is plotted if no named layers are found.
   
 </_param>

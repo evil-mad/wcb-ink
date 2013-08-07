@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/watercolorbot/
 #
-# Version 0.1 (Rev A32), dated 8/2/2013
+# Version 0.1 (Rev A34), dated 8/6/2013
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -296,8 +296,11 @@ class WCB( inkex.Effect ):
 		self.svgDataRead = False
 		self.svgLastPath = int( 0 )
 		self.svgLastPathNC = int( 0 )
-		self.svgTotalDeltaX = int( 0 )
-		self.svgTotalDeltaY = int( 0 )
+		self.svgLastKnownPosX = float( 0.0 )
+		self.svgLastKnownPosY = float( 0.0 )
+		self.svgPausedPosX = float( 0.0 )
+		self.svgPausedPosY = float( 0.0 )		 
+		
 		self.paintdist = 0.0
 		self.ReInkingNow = False 
 		self.manConfMode = False
@@ -342,30 +345,28 @@ class WCB( inkex.Effect ):
 			unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
 			self.resumePlotSetup()
 			if self.resumeMode:
-				self.plotToWCB()
-			elif ( self.options.resumeType == "justGoHome" ):
-				if self.serialPort is None:
-					return
-				self.ServoSetup()
-				self.penUp() 
-				self.sendEnableMotors() #Set plotting resolution 
-				self.fSpeed = self.options.penUpSpeed
-
-				self.fCurrX = self.svgTotalDeltaX 
-				self.fCurrY = self.svgTotalDeltaY
-# 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
-# 				inkex.errormsg('self.fCurrY: ' + str(self.fCurrY)) 
-				self.fX = 0
-				self.fY = 0
-				
+				self.fX = self.svgPausedPosX + wcb_conf.F_StartPos_X
+				self.fY = self.svgPausedPosY + wcb_conf.F_StartPos_Y
+ 				self.resumeMode = False
 				self.plotLineAndTime(self.fX, self.fY) 
+				self.resumeMode = True
+# 				self.svgLastKnownPosX = self.fX
+# 				self.svgLastKnownPosY = self.fY
+				self.nodeCount = 0
+# 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
+# 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
 				
-				self.svgTotalDeltaX = self.fX
-				self.svgTotalDeltaY = self.fY
-#  				inkex.errormsg('self.fX: ' + str(self.fX)) 
-#  				inkex.errormsg('self.fY: ' + str(self.fY)) 
+				self.plotToWCB() 
+				
+			elif ( self.options.resumeType == "justGoHome" ):
+				self.fX = wcb_conf.F_StartPos_X
+				self.fY = wcb_conf.F_StartPos_Y 
+				self.plotLineAndTime(self.fX, self.fY)  
+# 				self.svgLastKnownPosX = self.fX
+# 				self.svgLastKnownPosY = self.fY 
 			else:
 				inkex.errormsg( gettext.gettext( "Truly sorry, there does not seem to be any in-progress plot to resume." ) )
+
 
 		elif self.options.tab == '"layers"': 
 			self.PrintFromLayersTab = True
@@ -389,65 +390,13 @@ class WCB( inkex.Effect ):
 			self.WCBOpenSerial()
 			self.manualCommand()
 
+
 		self.svgDataRead = False
 		self.UpdateSVGWCBData( self.svg )
 		self.WCBCloseSerial()
 		return
 
-	def CheckSVGforWCBData( self ):
-		self.svgDataRead = False
-		self.recursiveWCBDataScan( self.svg )
-# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
-		if ( not self.svgDataRead ):    #if there is no WCB data, add some:
-			WCBlayer = inkex.etree.SubElement( self.svg, 'WCB' )
-			WCBlayer.set( 'serialport', '' )
-			WCBlayer.set( 'layer', str( 0 ) )
-			WCBlayer.set( 'node', str( 0 ) )
-			WCBlayer.set( 'lastpath', str( 0 ) )
-			WCBlayer.set( 'lastpathnc', str( 0 ) )
-			WCBlayer.set( 'totaldeltax', str( 0 ) )
-			WCBlayer.set( 'totaldeltay', str( 0 ) )
-			
-# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
-# 		inkex.errormsg('self.svgTotalDeltaX: ' + str(self.svgTotalDeltaX)) 
-# 		inkex.errormsg('self.svgTotalDeltaY: ' + str(self.svgTotalDeltaY)) 
 
-	def recursiveWCBDataScan( self, aNodeList ):
-		if ( not self.svgDataRead ):
-			for node in aNodeList:
-				if node.tag == 'svg':
-					self.recursiveWCBDataScan( node )
-				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
-					try:
-						self.svgSerialPort = node.get( 'serialport' )
-						self.svgLayer = int( node.get( 'layer' ) )
-						self.svgNodeCount = int( node.get( 'node' ) )
-						self.svgLastPath = int( node.get( 'lastpath' ) )
-						self.svgLastPathNC = int( node.get( 'lastpathnc' ) )
-						self.svgTotalDeltaX = float( node.get( 'totaldeltax' ) )
-						self.svgTotalDeltaY = float( node.get( 'totaldeltay' ) ) 
-						self.svgDataRead = True
-					except:
-						pass
-
-	def UpdateSVGWCBData( self, aNodeList ):
-# 		inkex.errormsg('self.svgTotalDeltaX: ' + str(self.svgTotalDeltaX)) 
-#  		inkex.errormsg('self.svgTotalDeltaY: ' + str(self.svgTotalDeltaY)) 
-		if ( not self.svgDataRead ):
-			for node in aNodeList:
-				if node.tag == 'svg':
-					self.UpdateSVGWCBData( node )
-				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
-					node.set( 'serialport', self.svgSerialPort )
-					node.set( 'layer', str( self.svgLayer ) )
-					node.set( 'node', str( self.svgNodeCount ) )
-					node.set( 'lastpath', str( self.svgLastPath ) )
-					node.set( 'lastpathnc', str( self.svgLastPathNC ) )
-					node.set( 'totaldeltax', str( (self.svgTotalDeltaX / self.stepsPerPx) ) )
-					node.set( 'totaldeltay', str( (self.svgTotalDeltaY / self.stepsPerPx) ) )
-					self.svgDataRead = True
-					
-					
 					
 	def resumePlotSetup( self ):
 		self.LayerFound = False
@@ -463,25 +412,80 @@ class WCB( inkex.Effect ):
 		if ( self.LayerFound ):
 			if ( self.svgNodeCount > 0 ):
 				self.nodeTarget = self.svgNodeCount
-				self.resumeMode = True
-				
-				if self.options.resumeType == "ResumeFromHome":
-					self.penUp()
-				elif self.options.resumeType == "ResumeInSitu":
-					self.penUp()		
-				else:  #i.e., self.options.resumeType == "justGoHome":  
-					self.resumeMode = False
-				
-# 					self.fX = wcb_conf.F_StartPos_X
-# 					self.fY = wcb_conf.F_StartPos_Y
-# 					self.plotLineAndTime(self.fX, self.fY)
-# 					self.penUp()   #Always end with pen-up
-# 					self.svgLayer = 0
-# 					self.svgNodeCount = 0
-# 					self.svgLastPath = 0
-# 					self.svgLastPathNC = 0
-# 					self.svgTotalDeltaX = 0
-# 					self.svgTotalDeltaY = 0
+				if self.options.resumeType == "ResumeNow":
+					self.resumeMode = True
+				if self.serialPort is None:
+					return
+				self.ServoSetup()
+				self.penUp() 
+				self.sendEnableMotors() #Set plotting resolution  
+				self.fSpeed = self.options.penUpSpeed
+				self.fCurrX = self.svgLastKnownPosX + wcb_conf.F_StartPos_X
+				self.fCurrY = self.svgLastKnownPosY + wcb_conf.F_StartPos_Y
+				 
+
+	def CheckSVGforWCBData( self ):
+		self.svgDataRead = False
+		self.recursiveWCBDataScan( self.svg )
+# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
+		if ( not self.svgDataRead ):    #if there is no WCB data, add some:
+			WCBlayer = inkex.etree.SubElement( self.svg, 'WCB' )
+			WCBlayer.set( 'serialport', '' )
+			WCBlayer.set( 'layer', str( 0 ) )
+			WCBlayer.set( 'node', str( 0 ) )
+			WCBlayer.set( 'lastpath', str( 0 ) )
+			WCBlayer.set( 'lastpathnc', str( 0 ) )
+			WCBlayer.set( 'lastknownposx', str( 0 ) )  #Last known position of carriage
+			WCBlayer.set( 'lastknownposy', str( 0 ) )
+			WCBlayer.set( 'pausedposx', str( 0 ) )	   #The position of the carriage when "pause" was pressed.
+			WCBlayer.set( 'pausedposy', str( 0 ) )
+						
+# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
+# 		inkex.errormsg('self.svgLastKnownPosX: ' + str(self.svgLastKnownPosX)) 
+# 		inkex.errormsg('self.svgLastKnownPosY: ' + str(self.svgLastKnownPosY)) 
+
+	def recursiveWCBDataScan( self, aNodeList ):
+		if ( not self.svgDataRead ):
+			for node in aNodeList:
+				if node.tag == 'svg':
+					self.recursiveWCBDataScan( node )
+				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
+					try:
+						self.svgSerialPort = node.get( 'serialport' )
+						self.svgLayer = int( node.get( 'layer' ) )
+						self.svgNodeCount = int( node.get( 'node' ) )
+						self.svgLastPath = int( node.get( 'lastpath' ) )
+						self.svgLastPathNC = int( node.get( 'lastpathnc' ) )
+						self.svgLastKnownPosX = float( node.get( 'lastknownposx' ) )
+						self.svgLastKnownPosY = float( node.get( 'lastknownposy' ) ) 
+						self.svgPausedPosX = float( node.get( 'pausedposx' ) )
+						self.svgPausedPosY = float( node.get( 'pausedposy' ) ) 
+						self.svgDataRead = True
+					except:
+						pass
+
+	def UpdateSVGWCBData( self, aNodeList ):
+# 		inkex.errormsg('self.svgLastKnownPosX: ' + str(self.svgLastKnownPosX)) 
+#  		inkex.errormsg('self.svgLastKnownPosY: ' + str(self.svgLastKnownPosY)) 
+		if ( not self.svgDataRead ):
+			for node in aNodeList:
+				if node.tag == 'svg':
+					self.UpdateSVGWCBData( node )
+				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
+					node.set( 'serialport', self.svgSerialPort )
+					node.set( 'layer', str( self.svgLayer ) )
+					node.set( 'node', str( self.svgNodeCount ) )
+					node.set( 'lastpath', str( self.svgLastPath ) )
+					node.set( 'lastpathnc', str( self.svgLastPathNC ) )
+					node.set( 'lastknownposx', str( (self.svgLastKnownPosX ) ) )
+					node.set( 'lastknownposy', str( (self.svgLastKnownPosY ) ) )
+					node.set( 'pausedposx', str( (self.svgPausedPosX) ) )
+					node.set( 'pausedposy', str( (self.svgPausedPosY) ) )
+					
+					self.svgDataRead = True
+					
+					
+									
 
 	def setupCommand( self ):
 		"""Execute commands from the "setup" tab"""
@@ -752,25 +756,23 @@ class WCB( inkex.Effect ):
 			# wrap everything in a try so we can for sure close the serial port 
 			self.recursivelyTraverseSvg( self.svg, self.svgTransform )
 			self.penUp()   #Always end with pen-up
-
-			# Logically, we want to turn the engraver off here as well,
-			# but we put that in our finally clause instead 
-
-			# return to home, if returnToHome = True 
+ 
+			# return to home after end of normal plot
 			if ( ( not self.bStopped ) and ( self.ptFirst ) ):
 				self.fX = self.ptFirst[0]
-				self.fY = self.ptFirst[1]
-				#self.penUp()
-				self.nodeCount = self.nodeTarget    # enablesfpx return-to-home only option 
+				self.fY = self.ptFirst[1] 
+				self.nodeCount = self.nodeTarget    
 				self.plotLineAndTime(self.fX, self.fY ) 
 			#inkex.errormsg('Final node count: ' + str(self.svgNodeCount))  #Node Count - Debug option
-			if ( not self.bStopped ):
+			if ( not self.bStopped ):  #Clear saved position data from SVG file.
 				self.svgLayer = 0
 				self.svgNodeCount = 0
 				self.svgLastPath = 0
 				self.svgLastPathNC = 0
-				self.svgTotalDeltaX = 0
-				self.svgTotalDeltaY = 0
+				self.svgLastKnownPosX = 0
+				self.svgLastKnownPosY = 0
+				self.svgPausedPosX = 0
+				self.svgPausedPosY = 0
 
 		finally:
 			# We may have had an exception and lost the serial port...
@@ -853,6 +855,7 @@ class WCB( inkex.Effect ):
 				# if we're in resume mode and self.pathcount = self.svgLastPath,
 				#    then start here, and set
 				# self.nodeCount equal to self.svgLastPathNC
+				
 				if self.resumeMode and ( self.pathcount == self.svgLastPath ):
 					self.nodeCount = self.svgLastPathNC
 				if self.resumeMode and ( self.pathcount < self.svgLastPath ):
@@ -860,8 +863,8 @@ class WCB( inkex.Effect ):
 				else:
 					self.plotPath( node, matNew )
 					if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-						self.svgLastPath += 1
-						self.svgLastPathNC = self.nodeCount
+						self.svgLastPath += 1	#The number of the last path completed
+						self.svgLastPathNC = self.nodeCount #the node count after the last path was completed.
 
 			elif node.tag == inkex.addNS( 'rect', 'svg' ) or node.tag == 'rect':
 
@@ -877,11 +880,13 @@ class WCB( inkex.Effect ):
 				# fourth side implicitly
 
 				self.pathcount += 1
+				 
 				# if we're in resume mode AND self.pathcount < self.svgLastPath,
 				#    then skip over this path.
 				# if we're in resume mode and self.pathcount = self.svgLastPath,
 				#    then start here, and set
 				# self.nodeCount equal to self.svgLastPathNC
+				
 				if self.resumeMode and ( self.pathcount == self.svgLastPath ):
 					self.nodeCount = self.svgLastPathNC
 				if self.resumeMode and ( self.pathcount < self.svgLastPath ):
@@ -1286,6 +1291,8 @@ class WCB( inkex.Effect ):
 		Here, we convert from floating-point pixel scale to actual motor steps, w/ current DPI.
 		'''
 
+		maxSegmentDuration = 250.0  # Maximum time to spend painting a given segment
+
 		if self.bStopped:
 			return
 		if ( self.fCurrX is None ):
@@ -1314,16 +1321,14 @@ class WCB( inkex.Effect ):
 					#inkex.errormsg('First node plotted will be number: ' + str(self.nodeCount))
 					if ( not self.virtualPenIsUp ):
 						self.penDown()
-						self.fSpeed = self.options.penDownSpeed
+						self.fSpeed = self.BrushDownSpeed
 
 			nTime =  10000.00 / self.fSpeed * distance( nDeltaX, nDeltaY )
 			nTime = int( math.ceil(nTime / 10.0))
 
 			while ( ( abs( nDeltaX ) > 0 ) or ( abs( nDeltaY ) > 0 ) ):
 			
-			
-				# Put re-inking *before* the movement here, so that we only do it if there's more painting.
-				
+				# Put re-inking *before* the movement here, so that we only do it if there's more painting. 
 				if (self.ReInkingNow == False):
 					if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
 						if (self.paintdist > self.options.reInkDist): 
@@ -1331,9 +1336,7 @@ class WCB( inkex.Effect ):
 			
 				xd = 0
 				yd = 0
-				
-				maxSegmentDuration = 250.0  # Maximum time to spend painting a given segment
-				
+								
 				if ( nTime > maxSegmentDuration ):
 					xd = int( math.floor( ( maxSegmentDuration * nDeltaX ) / nTime ) )
 					yd = int( math.floor( ( maxSegmentDuration * nDeltaY ) / nTime ) )
@@ -1345,7 +1348,8 @@ class WCB( inkex.Effect ):
 					if ( td < 1 ):
 					   td = 1		# don't allow zero-time moves.
 
-				if ( not self.resumeMode ):
+							
+				if (not self.resumeMode):							
 					if ( self.options.revMotor1 ):
 						xd2 = -xd
 					else:
@@ -1356,32 +1360,33 @@ class WCB( inkex.Effect ):
 						yd2 = yd 
 						
 					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r'
-					self.svgTotalDeltaX += xd
-					self.svgTotalDeltaY += yd
-					self.doCommand( strOutput )
 
+					self.doCommand( strOutput )
+					self.fCurrX += xd / self.stepsPerPx   # Update current position
+					self.fCurrY += yd / self.stepsPerPx		
+					self.svgLastKnownPosX += xd / self.stepsPerPx
+					self.svgLastKnownPosY += yd / self.stepsPerPx
+					
+					if (self.ReInkingNow == False):
+						if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
+							self.paintdist += distance( xd, yd )
+											
 				nDeltaX -= xd
-				nDeltaY -= yd
-				self.fCurrX += xd / self.stepsPerPx   # Update current position
-				self.fCurrY += yd / self.stepsPerPx				
-				
+				nDeltaY -= yd 
 				nTime -= td
-				if (self.ReInkingNow == False):
-					if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
-						self.paintdist += distance( xd, yd )
 				
-    			#self.doCommand('NI\r')  #Increment node counter on EBB
-    			strButton = self.doRequest( 'QB\r' ) #Query if button pressed
-    			if strButton[0] == '0':
-    				pass #button not pressed
-    			else:
-    				self.svgNodeCount = self.nodeCount;
-    				inkex.errormsg( 'Plot paused by button press after segment number ' + str( self.nodeCount ) + '.' )
-    				inkex.errormsg( 'Use the "resume" feature to continue.' )
-    				#self.penUp()  # Should be redundant...
-    				#self.engraverOff()
-    				self.bStopped = True
-    				return
+			strButton = self.doRequest( 'QB\r' ) #Query if button pressed
+			if strButton[0] != '0':
+				self.svgNodeCount = self.nodeCount;
+				self.svgPausedPosX = self.fCurrX - wcb_conf.F_StartPos_X	#self.svgLastKnownPosX
+				self.svgPausedPosY = self.fCurrY - wcb_conf.F_StartPos_Y	#self.svgLastKnownPosY
+			
+				
+				inkex.errormsg( 'Plot paused by button press after segment number ' + str( self.nodeCount ) + '.' )
+				inkex.errormsg( 'Use the "Resume" feature to continue.' )
+				self.bStopped = True
+				return
+					
 
 	def sendEnableMotors( self ):
 		if ( self.options.resolution == 1 ):
