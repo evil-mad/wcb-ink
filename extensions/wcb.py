@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/watercolorbot/
 #
-# Version 0.1 (Rev A34), dated 8/6/2013
+# Version 0.1 (Rev A37), dated 8/11/2013
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -51,6 +51,8 @@ N_PEN_UP_DELAY = 400      # delay (ms) for the pen to up down before the next mo
 
 N_PEN_UP_POS = 50      # Default pen-up position
 N_PEN_DOWN_POS = 40      # Default pen-down position
+N_PEN_WASH_POS = 35      # Default pen-wash position
+
 N_SERVOSPEED = 50			# Default pen-lift speed 
 N_DEFAULT_LAYER = 1			# Default inkscape layer
 
@@ -166,7 +168,12 @@ class WCB( inkex.Effect ):
 		self.OptionParser.add_option( "--penDownPosition",
 			action="store", type="int",
 			dest="penDownPosition", default=N_PEN_DOWN_POS,
-			help="Position of pen when lowered" )
+			help="Position of pen for painting" )
+		self.OptionParser.add_option( "--penWashPosition",
+			action="store", type="int",
+			dest="penWashPosition", default=N_PEN_WASH_POS,
+			help="Position of pen for washing" )			
+			 
 		self.OptionParser.add_option( "--setupType",
 			action="store", type="string",
 			dest="setupType", default="controls",
@@ -217,6 +224,15 @@ class WCB( inkex.Effect ):
 			action="store", type="float",
 			dest="smoothness", default=.2,
 			help="Smoothness of curves" ) 			
+		self.OptionParser.add_option( "--backlashX",
+			action="store", type="float",
+			dest="backlashX", default=0.0,
+			help="Backlash compensation, X direction" ) 					
+		self.OptionParser.add_option( "--backlashY",
+			action="store", type="float",
+			dest="backlashY", default=0.0,
+			help="Backlash compensation, Y direction" ) 			 
+			
 		self.OptionParser.add_option( "--resolution",
 			action="store", type="int",
 			dest="resolution", default=3,
@@ -299,10 +315,16 @@ class WCB( inkex.Effect ):
 		self.svgLastKnownPosX = float( 0.0 )
 		self.svgLastKnownPosY = float( 0.0 )
 		self.svgPausedPosX = float( 0.0 )
-		self.svgPausedPosY = float( 0.0 )		 
+		self.svgPausedPosY = float( 0.0 )	
+		
+		self.backlashStepsX = int(0)
+		self.backlashStepsY = int(0)	 
+		self.XBacklashFlag = True
+		self.YBacklashFlag = True
 		
 		self.paintdist = 0.0
 		self.ReInkingNow = False 
+		self.CleaningNow = False
 		self.manConfMode = False
 		self.PrintFromLayersTab = False
 		self.xErr = 0.0
@@ -500,8 +522,17 @@ class WCB( inkex.Effect ):
 			self.sendDisableMotors()
 
 		elif self.options.setupType == "toggle-pen":
+			self.CleaningNow = False
+			self.ServoSetMode()
 			self.doCommand( 'TP\r' )		#Toggle pen
 
+		elif self.options.setupType == "toggle-wash":  
+			self.CleaningNow = True 
+			self.ServoSetMode()
+			self.doCommand( 'TP\r' )		#Toggle pen
+ 			self.CleaningNow = False
+
+			
 	def manualCommand( self ):
 		"""Execute commands from the "manual" tab"""
 
@@ -569,12 +600,14 @@ class WCB( inkex.Effect ):
 
 
 	def CleanBrush(self):  
+		self.CleaningNow = True
 		self.MoveToWater(0)
 		self.PaintSwirl(wcb_conf.WashCycles, wcb_conf.WashDelta[0], wcb_conf.WashDelta[1])   
 		self.MoveToWater(1)# 
 		self.PaintSwirl(wcb_conf.WashCycles, wcb_conf.WashDelta[0], wcb_conf.WashDelta[1])   
 		self.MoveToWater(2)	
 		self.PaintSwirl(wcb_conf.WashCycles, wcb_conf.WashDelta[0], wcb_conf.WashDelta[1])   
+		self.CleaningNow = False
 
 	def MoveDeltaXY(self,xDist,yDist):  
 		self.fX = self.fX + xDist   #Todo: Add limit checking?
@@ -1300,13 +1333,15 @@ class WCB( inkex.Effect ):
 		
 		xTemp = self.stepsPerPx * ( xDest - self.fCurrX ) + self.xErr
 		yTemp = self.stepsPerPx * ( yDest - self.fCurrY ) + self.yErr
-		
+
+					
 		nDeltaX = int (round(xTemp)) # Number of motor steps required
 		nDeltaY = int (round(yTemp)) 
 		 
 		self.xErr = xTemp - float(nDeltaX)  # Keep track of rounding errors, so that they do not accumulate.
 		self.yErr = yTemp - float(nDeltaY)
-		
+				
+		 	
 		if self.bPenIsUp:
 			self.fSpeed = self.BrushUpSpeed
 		else:
@@ -1349,7 +1384,7 @@ class WCB( inkex.Effect ):
 					   td = 1		# don't allow zero-time moves.
 
 							
-				if (not self.resumeMode):							
+				if (not self.resumeMode):
 					if ( self.options.revMotor1 ):
 						xd2 = -xd
 					else:
@@ -1358,6 +1393,22 @@ class WCB( inkex.Effect ):
 						yd2 = -yd
 					else:
 						yd2 = yd 
+						
+					#Backlash correction: At motor level only; no record kept of its effect on position.	
+					if ((xd2 < 0) and not self.XBacklashFlag):
+						self.XBacklashFlag = True
+						xd2 -= self.backlashStepsX
+					if ((xd2 > 0) and self.XBacklashFlag):
+						self.XBacklashFlag = False
+						xd2 += self.backlashStepsX		
+							
+					if ((yd2 < 0) and not self.YBacklashFlag):
+						self.YBacklashFlag = True
+						yd2 -= self.backlashStepsY
+					if ((yd2 > 0) and self.YBacklashFlag):
+						self.YBacklashFlag = False
+						yd2 += self.backlashStepsY		
+												
 						
 					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r'
 
@@ -1405,6 +1456,13 @@ class WCB( inkex.Effect ):
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 4
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 4
 		self.options.reInkDist = self.options.reInkDist * 90 * self.stepsPerPx # in motor steps
+		# Motor steps for backlash compensation:
+		# self.options.backlashX is in mils, need to calculate how many steps that is.
+		# self.options.backlashX * (1 inch/1000 mils) * (90 px/1 inch) * self.stepsPerPx
+		self.backlashStepsX = int( round(self.options.backlashX * (0.09 * self.stepsPerPx)))
+		self.backlashStepsY = int( round(self.options.backlashY * (0.09 * self.stepsPerPx)))
+# 		inkex.errormsg('self.backlashStepsX: ' + str(self.backlashStepsX)) 
+# 		inkex.errormsg('self.backlashStepsY: ' + str(self.backlashStepsY)) 
 
 	def sendDisableMotors( self ):
 		# Insist on turning the engraver off.  
@@ -1432,12 +1490,16 @@ class WCB( inkex.Effect ):
 
 	def penDown( self ):
 		self.virtualPenIsUp = False  # Virtual pen keeps track of state for resuming plotting.
-		if ( not self.resumeMode ):
+		if ( (not self.resumeMode) and ( not self.bStopped )):
 			#if self.penDownActivatesEngraver:
 			#		self.engraverOn() # will check self.enableEngraver
+			self.ServoSetMode()
 			self.doCommand( 'SP,0\r' )
 			self.doTimedPause( self.options.penDownDelay ) # pause for pen to go down
 			self.bPenIsUp = False
+ 			
+
+
 
 # 	def engraverOff( self ):
 # 		# Note: we don't check self.engraverIsOn -- turn it off regardless
@@ -1488,12 +1550,22 @@ class WCB( inkex.Effect ):
 		self.doCommand( 'SC,11,' + str( intTemp ) + '\r' )
 		intTemp = 5 * self.options.ServoDownSpeed
 		self.doCommand( 'SC,12,' + str( intTemp ) + '\r' )
+		
+		
+	def ServoSetMode (self):
+		if (self.CleaningNow):
+			intTemp = 240 * ( self.options.penWashPosition + 25 )
+			self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )			
+		else:
+			intTemp = 240 * ( self.options.penDownPosition + 25 )
+			self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )	
+		
+		
+		
 
 	def stop( self ):
 		self.bStopped = True
 		
-
-
 	def getLength( self, name, default ):
 		'''
 		Get the <svg> attribute with name "name" and default value "default"

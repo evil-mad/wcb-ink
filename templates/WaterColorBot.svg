@@ -11,7 +11,10 @@
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
    width="990"
    height="720"
-   sodipodi:docname="New WaterColorBot Drawing">
+   sodipodi:docname="WaterColorBot.svg"
+   id="svg2"
+   version="1.1"
+   inkscape:version="0.48.1 r9760">
   <defs
      id="defs6412" />
   <sodipodi:namedview
@@ -22,14 +25,17 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="0.4"
-     inkscape:cx="495"
+     inkscape:cx="192.5"
      inkscape:cy="360"
      inkscape:document-units="in"
-     inkscape:current-layer="layer1"
-     inkscape:window-width="700"
-     inkscape:window-height="500"
+     inkscape:current-layer="layer7"
+     inkscape:window-width="1676"
+     inkscape:window-height="1006"
      showgrid="false"
-     units="in"/>
+     units="in"
+     inkscape:window-x="0"
+     inkscape:window-y="0"
+     inkscape:window-maximized="1" />
   <metadata
      id="metadata6415">
     <rdf:RDF>
@@ -44,22 +50,6 @@
   </metadata>
   <g
      inkscape:groupmode="layer"
-     id="layer8"
-     inkscape:label="8-Brown" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer7"
-     inkscape:label="7-Violet" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer6"
-     inkscape:label="6-Blue" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer5"
-     inkscape:label="5-Green" />
-  <g
-     inkscape:groupmode="layer"
      id="layer4"
      inkscape:label="4-Yellow" />
   <g
@@ -70,6 +60,22 @@
      inkscape:groupmode="layer"
      id="layer2"
      inkscape:label="2-Red" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer5"
+     inkscape:label="5-Green" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer6"
+     inkscape:label="6-Blue" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer7"
+     inkscape:label="7-Violet" />
+  <g
+     inkscape:groupmode="layer"
+     id="layer8"
+     inkscape:label="8-Brown" />
   <g
      inkscape:groupmode="layer"
      id="layer1"
