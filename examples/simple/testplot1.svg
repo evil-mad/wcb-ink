@@ -24,7 +24,7 @@
      inkscape:pageopacity="0.0"
      inkscape:pageshadow="2"
      inkscape:zoom="1.1458333"
-     inkscape:cx="389.4"
+     inkscape:cx="283.8"
      inkscape:cy="360"
      inkscape:document-units="px"
      inkscape:current-layer="layer3"
@@ -51,44 +51,26 @@
     </rdf:RDF>
   </metadata>
   <g
-     inkscape:groupmode="layer"
-     id="layer3"
-     inkscape:label="2-Red"
+     style="display:inline"
      transform="translate(0,-6429.6001)"
-     style="display:inline">
+     inkscape:label="2-Red"
+     id="layer3"
+     inkscape:groupmode="layer">
     <path
-       sodipodi:type="star"
-       style="color:#000000;fill:none;stroke:#ff0000;stroke-width:38.83713531;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
-       id="path3901-0"
-       sodipodi:sides="5"
-       sodipodi:cx="6497.5928"
-       sodipodi:cy="3133.4075"
-       sodipodi:r1="3097.2781"
-       sodipodi:r2="2682.3215"
-       sodipodi:arg1="0"
-       sodipodi:arg2="0.62831853"
-       inkscape:flatsided="true"
-       inkscape:rounded="-0.75"
-       inkscape:randomized="0"
+       transform="matrix(0.0728277,0.0728277,-0.07282811,0.07282811,260.47004,6089.8114)"
        d="m 9594.8708,3133.4075 c 0,-2730.80159 -4737.3131,3789.5506 -2140.1665,2945.6865 2597.1467,-843.8641 -5067.987,-3334.417 -3462.8621,-1125.1522 1605.1249,2209.2649 1605.1249,-5850.33358 0,-3641.0687 C 2386.7173,3522.138 10051.851,1031.5851 7454.7043,187.72097 4857.5577,-656.14312 9594.8708,5864.209 9594.8708,3133.4075 z"
-       transform="matrix(0.0728277,0.0728277,-0.07282811,0.07282811,260.47004,6089.8114)" />
+       inkscape:randomized="0"
+       inkscape:rounded="-0.75"
+       inkscape:flatsided="true"
+       sodipodi:arg2="0.62831853"
+       sodipodi:arg1="0"
+       sodipodi:r2="2682.3215"
+       sodipodi:r1="3097.2781"
+       sodipodi:cy="3133.4075"
+       sodipodi:cx="6497.5928"
+       sodipodi:sides="5"
+       id="path3901-0"
+       style="color:#000000;fill:none;stroke:#ff0000;stroke-width:38.83713531;stroke-linecap:butt;stroke-linejoin:round;stroke-miterlimit:4;stroke-opacity:1;stroke-dasharray:none;stroke-dashoffset:0;marker:none;visibility:visible;display:inline;overflow:visible;enable-background:accumulate"
+       sodipodi:type="star" />
   </g>
-  <eggbot
-     serialport="/dev/cu.usbmodemfd131"
-     layer="0"
-     node="0"
-     lastpath="0"
-     lastpathnc="0"
-     totaldeltax="0"
-     totaldeltay="0"
-     id="eggbot2990" />
-  <WCB
-     serialport="/dev/cu.usbmodemfd131"
-     layer="0"
-     node="0"
-     lastpath="0"
-     lastpathnc="0"
-     totaldeltax="0"
-     totaldeltay="0"
-     id="WCB3005" />
 </svg>

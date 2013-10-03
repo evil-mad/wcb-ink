@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/watercolorbot/
 #
-# Version 0.1 (Rev A37), dated 8/11/2013
+# Version 0.1 (Rev A39), dated 9/28/2013
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -62,10 +62,7 @@ N_DEFAULT_LAYER = 1			# Default inkscape layer
 # F_StartPos_X = -270.0   #parking position, in pixels
 # F_StartPos_Y = 0.0      #parking position, in pixels
 # 
-# N_Water_X = 0.0     #Position of 
-
-
-
+# N_Water_X = 0.0    
 
 # if bDebug = True, create an HPGL file to show what is being plotted.
 # Pen up moves are shown in a different color if bDrawPenUpLines = True.
@@ -215,11 +212,11 @@ class WCB( inkex.Effect ):
 		self.OptionParser.add_option( "--reInkDist",
 			action="store", type="float",
 			dest="reInkDist", default=10,
-			help="Re-ink distance (inches)" )
-		self.OptionParser.add_option( "--reInkRand",
-			action="store", type="int",
-			dest="reInkRand", default=0,
-			help="Re-ink distance randomness (0-100%." )
+			help="Re-ink distance (inches)" ) 
+		self.OptionParser.add_option( "--LeadInDist",
+			action="store", type="float",
+			dest="LeadInDist", default=0.25,
+			help="Re-ink distance (inches)" ) 
 		self.OptionParser.add_option( "--smoothness",
 			action="store", type="float",
 			dest="smoothness", default=.2,
@@ -281,12 +278,6 @@ class WCB( inkex.Effect ):
 			action="store", type="int",
 			dest="layernumber", default=N_DEFAULT_LAYER,
 			help="Selected layer for multilayer plotting" )			
-						
-# 		self.OptionParser.add_option( "--engraving",
-# 			action="store", type="inkbool",
-# 			dest="engraving", default=False,
-# 			help="Enable optional engraving tool." )
-			
 			
 			
 		self.bPenIsUp = True
@@ -331,7 +322,13 @@ class WCB( inkex.Effect ):
 		self.yErr = 0.0
 
 		self.svgWidth = float( wcb_conf.N_PAGE_WIDTH )
-		self.svgHeight = float( wcb_conf.N_PAGE_HEIGHT )
+		self.svgHeight = float( wcb_conf.N_PAGE_HEIGHT ) 
+		
+		self.xBoundsMax = wcb_conf.N_PAGE_WIDTH
+		self.xBoundsMin = wcb_conf.F_StartPos_X
+		self.yBoundsMax = wcb_conf.N_PAGE_HEIGHT
+		self.yBoundsMin = wcb_conf.F_StartPos_Y		
+		
 		self.svgTransform = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 		
 		self.stepsPerPx = float( wcb_conf.F_DPI_16X / 90.0 )  
@@ -377,7 +374,6 @@ class WCB( inkex.Effect ):
 				self.nodeCount = 0
 # 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
 # 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
-				
 				self.plotToWCB() 
 				
 			elif ( self.options.resumeType == "justGoHome" ):
@@ -623,10 +619,14 @@ class WCB( inkex.Effect ):
 
 	def MoveToWater(self, dish):
 		self.penUp()  
+		self.xBoundsMin = wcb_conf.F_StartPos_X
+		self.yBoundsMin = wcb_conf.F_StartPos_Y
 		self.MoveToXY(wcb_conf.F_StartPos_X + wcb_conf.WaterLoc[dish][0], wcb_conf.F_StartPos_Y + wcb_conf.WaterLoc[dish][1])
 		# Values give X and Y positions of water dish 'dish.' 
 		 
 	def moveHome(self):
+		self.xBoundsMin = wcb_conf.F_StartPos_X
+		self.yBoundsMin = wcb_conf.F_StartPos_Y
 		self.MoveToXY(wcb_conf.F_StartPos_X, wcb_conf.F_StartPos_Y)
 				 		
 				
@@ -647,6 +647,8 @@ class WCB( inkex.Effect ):
 
 	def MoveToPaint(self, dish):
 		self.penUp() 
+		self.xBoundsMin = wcb_conf.F_StartPos_X
+		self.yBoundsMin = wcb_conf.F_StartPos_Y
 		self.MoveToXY(wcb_conf.F_StartPos_X + wcb_conf.PaintLoc[dish][0], wcb_conf.F_StartPos_Y + wcb_conf.PaintLoc[dish][1])
 
 
@@ -678,25 +680,33 @@ class WCB( inkex.Effect ):
 		
 	def reInkBrush(self):	
 		self.ReInkingNow = True
+		
+		#Redefine movement boundaries to include paint set & water
+		returnToXmin = self.xBoundsMin
+		returnToYmin = self.yBoundsMin 
+		self.xBoundsMin = wcb_conf.F_StartPos_X
+		self.yBoundsMin = wcb_conf.F_StartPos_Y
+		
 		returnToX = self.fCurrX # Save current position, to return to.
 		returnToY = self.fCurrY # Save current position, to return to.
 		
-		if (self.options.PreDipEnable):
+		if ((self.options.ReWetOnly) or (self.BrushColor == 0)): 
 			self.MoveToWater(0)
 			self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])   
-			
-		if ((self.options.ReWetOnly) or (self.BrushColor == 0)):
-			self.MoveToWater(0)
-			self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])   
-		else: 
+		else:			
+			if (self.options.PreDipEnable):
+				self.MoveToWater(0)
+				self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1]) 		
 			self.MoveToPaint( self.BrushColor - 1 )  
 			self.PaintSwirl(wcb_conf.InkReCycles, wcb_conf.InkReDelta[0], wcb_conf.InkReDelta[1])
-			
-		if (self.options.PostDipEnable):
-			self.MoveToWater(0)
-			self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
-							
-		self.MoveToXY(returnToX, returnToY)		
+			if (self.options.PostDipEnable):
+				self.MoveToWater(0)
+				self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
+		
+ 		self.xBoundsMin = returnToXmin
+ 		self.yBoundsMin = returnToYmin
+ 							
+		self.MoveToXY(returnToX, returnToY)		#TODO: Add lead-in here
 		self.penDown() 
 		self.ReInkingNow = False
 		self.paintdist = 0
@@ -773,11 +783,6 @@ class WCB( inkex.Effect ):
 		self.ServoSetup()
 		self.sendEnableMotors() #Set plotting resolution
 		
-		# Ensure that the engraver is turned off for the time being
-		# It will be turned back on when the first non-virtual pen-down occurs
-		#if self.options.engraving:
-		#	self.engraverOff()
-
 		if bDebug:
 			self.debugOut = open( DEBUG_OUTPUT_FILE, 'w' )
 			if bDrawPenUpLines:
@@ -792,10 +797,13 @@ class WCB( inkex.Effect ):
  
 			# return to home after end of normal plot
 			if ( ( not self.bStopped ) and ( self.ptFirst ) ):
+				self.xBoundsMin = wcb_conf.F_StartPos_X
+				self.yBoundsMin = wcb_conf.F_StartPos_Y
 				self.fX = self.ptFirst[0]
 				self.fY = self.ptFirst[1] 
-				self.nodeCount = self.nodeTarget    
+ 				self.nodeCount = self.nodeTarget    
 				self.plotLineAndTime(self.fX, self.fY ) 
+# 				self.moveHome()	 
 			#inkex.errormsg('Final node count: ' + str(self.svgNodeCount))  #Node Count - Debug option
 			if ( not self.bStopped ):  #Clear saved position data from SVG file.
 				self.svgLayer = 0
@@ -809,9 +817,7 @@ class WCB( inkex.Effect ):
 
 		finally:
 			# We may have had an exception and lost the serial port...
-			self.penDownActivatesEngraver = False
-			#if ( not ( self.serialPort is None ) ) and ( self.options.engraving ):
-			#	self.engraverOff()
+			pass
 
 	def recursivelyTraverseSvg( self, aNodeList,
 			matCurrent=[[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]],
@@ -945,6 +951,10 @@ class WCB( inkex.Effect ):
 					a.append( [' Z', []] )
 					newpath.set( 'd', simplepath.formatPath( a ) )
 					self.plotPath( newpath, matNew )
+					if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
+						self.svgLastPath += 1
+						self.svgLastPathNC = self.nodeCount
+
 
 			elif node.tag == inkex.addNS( 'line', 'svg' ) or node.tag == 'line':
 
@@ -1155,6 +1165,7 @@ class WCB( inkex.Effect ):
 						if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
 							self.svgLastPath += 1
 							self.svgLastPathNC = self.nodeCount
+							
 			elif node.tag == inkex.addNS( 'metadata', 'svg' ) or node.tag == 'metadata':
 				pass
 			elif node.tag == inkex.addNS( 'defs', 'svg' ) or node.tag == 'defs':
@@ -1180,7 +1191,7 @@ class WCB( inkex.Effect ):
 			elif node.tag == inkex.addNS( 'image', 'svg' ) or node.tag == 'image':
 				if not self.warnings.has_key( 'image' ):
 					inkex.errormsg( gettext.gettext( 'Warning: unable to draw bitmap images; ' +
-						'please convert them to line art first.  Consider using the "Trace bitmap..." ' +
+						'please convert them to line art first. Consider using the "Trace bitmap..." ' +
 						'tool of the "Path" menu.  Mac users please note that some X11 settings may ' +
 						'cause cut-and-paste operations to paste in bitmap copies.' ) )
 					self.warnings['image'] = 1
@@ -1282,6 +1293,12 @@ class WCB( inkex.Effect ):
 		if (self.BrushColor != self.LayerPaintColor):
 			self.PaintToolChange(self.LayerPaintColor)
 
+		# reset page bounds for plotting:
+		self.xBoundsMax = wcb_conf.N_PAGE_WIDTH
+		self.xBoundsMin = 0
+		self.yBoundsMax = wcb_conf.N_PAGE_HEIGHT
+		self.yBoundsMin = 0
+
 		p = cubicsuperpath.parsePath( d )
 
 		# ...and apply the transformation to each point
@@ -1323,9 +1340,18 @@ class WCB( inkex.Effect ):
 		Important note: Everything up to this point uses in *pixel* scale. 
 		Here, we convert from floating-point pixel scale to actual motor steps, w/ current DPI.
 		'''
-
+		
 		maxSegmentDuration = 250.0  # Maximum time to spend painting a given segment
-
+		
+		if (xDest > self.xBoundsMax):	#Check machine size limit; truncate at edges
+			xDest = self.xBoundsMax
+		if (xDest < self.xBoundsMin):	#Check machine size limit; truncate at edges
+			xDest = self.xBoundsMin			
+		if (yDest > self.yBoundsMax):	#Check machine size limit; truncate at edges
+			yDest = self.yBoundsMax
+		if (yDest < self.yBoundsMin):	#Check machine size limit; truncate at edges
+			yDest = self.yBoundsMin
+			
 		if self.bStopped:
 			return
 		if ( self.fCurrX is None ):
@@ -1351,9 +1377,9 @@ class WCB( inkex.Effect ):
 			self.nodeCount += 1
 
 			if self.resumeMode:
-				if ( self.nodeCount > self.nodeTarget ):
+				if ( self.nodeCount >= self.nodeTarget ):
 					self.resumeMode = False
-					#inkex.errormsg('First node plotted will be number: ' + str(self.nodeCount))
+					inkex.errormsg('First node plotted will be number: ' + str(self.nodeCount))
 					if ( not self.virtualPenIsUp ):
 						self.penDown()
 						self.fSpeed = self.BrushDownSpeed
@@ -1389,7 +1415,7 @@ class WCB( inkex.Effect ):
 						xd2 = -xd
 					else:
 						xd2 = xd
-					if ( self.options.revMotor2 ):
+					if ( self.options.revMotor2):
 						yd2 = -yd
 					else:
 						yd2 = yd 
@@ -1415,8 +1441,12 @@ class WCB( inkex.Effect ):
 					self.doCommand( strOutput )
 					self.fCurrX += xd / self.stepsPerPx   # Update current position
 					self.fCurrY += yd / self.stepsPerPx		
-					self.svgLastKnownPosX += xd / self.stepsPerPx
-					self.svgLastKnownPosY += yd / self.stepsPerPx
+
+					self.svgLastKnownPosX = self.fCurrX - wcb_conf.F_StartPos_X
+					self.svgLastKnownPosY = self.fCurrY - wcb_conf.F_StartPos_Y				
+					
+# 					self.svgLastKnownPosX += xd / self.stepsPerPx
+# 					self.svgLastKnownPosY += yd / self.stepsPerPx
 					
 					if (self.ReInkingNow == False):
 						if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
@@ -1465,8 +1495,6 @@ class WCB( inkex.Effect ):
 # 		inkex.errormsg('self.backlashStepsY: ' + str(self.backlashStepsY)) 
 
 	def sendDisableMotors( self ):
-		# Insist on turning the engraver off.  
-		#self.engraverOffManual()
 		self.doCommand( 'EM,0,0\r' )
 
 	def doTimedPause( self, nPause ):
@@ -1491,34 +1519,12 @@ class WCB( inkex.Effect ):
 	def penDown( self ):
 		self.virtualPenIsUp = False  # Virtual pen keeps track of state for resuming plotting.
 		if ( (not self.resumeMode) and ( not self.bStopped )):
-			#if self.penDownActivatesEngraver:
-			#		self.engraverOn() # will check self.enableEngraver
 			self.ServoSetMode()
 			self.doCommand( 'SP,0\r' )
 			self.doTimedPause( self.options.penDownDelay ) # pause for pen to go down
 			self.bPenIsUp = False
  			
 
-
-
-# 	def engraverOff( self ):
-# 		# Note: we don't check self.engraverIsOn -- turn it off regardless
-# 		# Reason being that we may not know the true hardware state
-# 		if self.options.engraving:
-# 			self.doCommand( 'PO,B,3,0\r' )
-# 			self.engraverIsOn = False
-			
-# 	def engraverOffManual( self ):
-# 		# Turn off engraver, whether or not the engraver is enabled. 
-# 		# This is only called by manual commands like "engraver off" and "motors off."
-# 		self.doCommand( 'PO,B,3,0\r' )
-# 		self.engraverIsOn = False			
-			
-# 	def engraverOn( self ):
-# 		if self.options.engraving and ( not self.engraverIsOn ):
-# 			self.engraverIsOn = True
-# 			self.doCommand( 'PD,B,3,0\r' )	#Added 6/6/2011, necessary.
-# 			self.doCommand( 'PO,B,3,1\r' )
 
 	def ServoSetupWrapper( self ):
 		self.ServoSetup()
@@ -1530,34 +1536,34 @@ class WCB( inkex.Effect ):
 			self.doCommand( 'SP,1\r' ) #Raise pen
 
 	def ServoSetup( self ):
-		# Pen position units range from 0% to 100%, which correspond to
-		# a timing range of 6000 - 30000 in units of 1/(12 MHz).
-		# 1% corresponds to 20 us, or 240 units of 1/(12 MHz).
+		''' Pen position units range from 0% to 100%, which correspond to
+		    a timing range of 7500 - 25000 in units of 1/(12 MHz).
+		    1% corresponds to ~14.6 us, or 175 units of 1/(12 MHz).
+		'''
 
-		intTemp = 240 * ( self.options.penUpPosition + 25 )
+		intTemp = 7500 + 175 * self.options.penUpPosition
 		self.doCommand( 'SC,4,' + str( intTemp ) + '\r' )
-		intTemp = 240 * ( self.options.penDownPosition + 25 )
+		intTemp = 7500 + 175 * self.options.penDownPosition
 		self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )
 
-		# Servo speed units are in units of %/second, referring to the
-		# percentages above.  The EBB takes speeds in units of 1/(12 MHz) steps
-		# per 21 ms.  Scaling as above, 1% in 1 second corresponds to
-		# 240 steps/s, which corresponds to 0.240 steps/ms, which corresponds
-		# to 5.04 steps/21 ms.  Rounding this to 5 steps/21 ms is correct
-		# to within 1 %.
-
-		intTemp = 5 * self.options.ServoUpSpeed
+		''' Servo speed units are in units of %/second, referring to the
+			percentages above.  The EBB takes speeds in units of 1/(12 MHz) steps
+			per 21 ms.  Scaling as above, 1% in 1 second corresponds to
+			175 steps/s, or 0.175 steps/ms, which corresponds
+			to ~3.6 steps/21 ms.  Rounding this to 4 steps/21 ms is sufficient.		'''
+		
+		intTemp = 4 * self.options.ServoUpSpeed
 		self.doCommand( 'SC,11,' + str( intTemp ) + '\r' )
-		intTemp = 5 * self.options.ServoDownSpeed
+		intTemp = 4 * self.options.ServoDownSpeed
 		self.doCommand( 'SC,12,' + str( intTemp ) + '\r' )
 		
 		
 	def ServoSetMode (self):
 		if (self.CleaningNow):
-			intTemp = 240 * ( self.options.penWashPosition + 25 )
+			intTemp = 7500 + 175 * self.options.penWashPosition
 			self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )			
 		else:
-			intTemp = 240 * ( self.options.penDownPosition + 25 )
+			intTemp = 7500 + 175 * self.options.penDownPosition
 			self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )	
 		
 		
@@ -1610,7 +1616,7 @@ class WCB( inkex.Effect ):
 			self.serialPort = open( DRY_RUN_OUTPUT_FILE, 'w' )
 
 		if self.serialPort is None:
-			inkex.errormsg( gettext.gettext( "Unable to find WaterColorBot on any serial port. :(" ) )
+			inkex.errormsg( gettext.gettext( "I couldn\'t find the WaterColorBot. :(" ) )
 
 	def WCBCloseSerial( self ):
 		try:

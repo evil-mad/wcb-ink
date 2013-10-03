@@ -1,6 +1,6 @@
 # wcb_conf.py
 # Part of the WaterColorBot driver for Inkscape
-# Version 0.1 (Rev A32), dated 8/2/2013
+# Version 0.1 (Rev A38), dated 8/28/2013
 #
 # https://github.com/oskay/watercolorbot/
 #
@@ -8,8 +8,8 @@
 
 
 
-N_PAGE_HEIGHT = 720       # Default page height (each unit equiv. to one step)  720 px =  8 inches
-N_PAGE_WIDTH = 990       # Default page width (each unit equiv. to one step)    990 px = 11 inches
+N_PAGE_HEIGHT = 720     # Default page height (each unit equiv. to one step)  720 px =  8 inches
+N_PAGE_WIDTH = 990      # Default page width (each unit equiv. to one step)    990 px = 11 inches
 
 F_DPI_16X = 896.0       #DPI @ 16X microstepping.  Default: 896.  Used in converting drawing size to motor steps.
 F_Speed_Scale = 40.0    #Default 100% speed, divided by 100. If value is 40 (default), 100% speed will be 4000 steps/s.
@@ -18,15 +18,13 @@ F_StartPos_X = -270.0   #parking position, in pixels. Default: -270 (-3 inches)
 F_StartPos_Y = 0.0      #parking position, in pixels. Default: 0
 
 
-
-
 '''
 WaterLoc: (X,Y) coordinates of center brush position in water dish, for each water dish.  
 Distances are in pixels, relative to home corner (0,0). Assume 90 px/inch.
 '''
 
 WaterLoc = [
-(10,45),  # dish 0 (top)
+(10,50),  # dish 0 (top)
 (10,315), # 1
 (10,585)  # 2
 ]
@@ -61,8 +59,8 @@ WashDelta: Maximum peak-to-peak excursion of brush while washing in water.
   (Delta-x,Delta-y). Distances in pixels.
 '''
 
-WashDelta = (0,80)
-WashCycles = 2
+WashDelta = (0,85)
+WashCycles = 3
 
 '''
 Water Dip Details:
@@ -89,7 +87,7 @@ InkDelta = (80,55)
 InkCycles = 1
 
 InkReCycles = 1
-InkReDelta = (25,20)
+InkReDelta = (50,35)
 
 
  
