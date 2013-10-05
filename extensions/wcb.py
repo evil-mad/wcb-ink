@@ -1,8 +1,8 @@
 # wcb.py
 # Part of the WaterColorBot driver for Inkscape
-# https://github.com/oskay/watercolorbot/
+# https://github.com/oskay/wcb-ink/
 #
-# Version 0.1 (Rev A39), dated 9/28/2013
+# Version 0.1 (Rev A42), dated 10/5/2013
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -19,9 +19,8 @@
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
 # TODO: Add and honor advisory locking around device open/close for non Win32
-
-# TODO: Add fencing (limit detection)
-
+ 
+# TODO: Lead-ins for fewer disruptions when going to get more ink
 # TODO: Implement random/ tolerance on auto-ink 
 #       It would be nice to go get more paint between painting segments, rather than exactly when "paint runs out"
 #       (If length of segment we're currently drawing + distance painted thus far) < 120% of repaint distance,
@@ -43,6 +42,8 @@ import sys
 import time
 import eggbot_scan
 import wcb_conf       
+
+
 
 
 F_DEFAULT_SPEED = 1
@@ -67,6 +68,9 @@ N_DEFAULT_LAYER = 1			# Default inkscape layer
 # if bDebug = True, create an HPGL file to show what is being plotted.
 # Pen up moves are shown in a different color if bDrawPenUpLines = True.
 # Try viewing the .hpgl file in a shareware program or create a simple viewer.
+
+
+
 
 bDebug = False
 miscDebug = False
@@ -213,10 +217,10 @@ class WCB( inkex.Effect ):
 			action="store", type="float",
 			dest="reInkDist", default=10,
 			help="Re-ink distance (inches)" ) 
-		self.OptionParser.add_option( "--LeadInDist",
-			action="store", type="float",
-			dest="LeadInDist", default=0.25,
-			help="Re-ink distance (inches)" ) 
+# 		self.OptionParser.add_option( "--LeadInDist",
+# 			action="store", type="float",
+# 			dest="LeadInDist", default=0.25,
+# 			help="Re-ink distance (inches)" ) 
 		self.OptionParser.add_option( "--smoothness",
 			action="store", type="float",
 			dest="smoothness", default=.2,
@@ -297,6 +301,19 @@ class WCB( inkex.Effect ):
 		self.LayersFoundToPlot = False
 		self.LayerPaintColor = -1
 		self.BrushColor = -1
+		
+		#Values read from file:
+		self.svgSerialPort_Old = ''
+		self.svgNodeCount_Old = int( 0 )
+		self.svgDataRead_Old = False
+		self.svgLastPath_Old = int( 0 )
+		self.svgLastPathNC_Old = int( 0 )
+		self.svgLastKnownPosX_Old = float( 0.0 )
+		self.svgLastKnownPosY_Old = float( 0.0 )
+		self.svgPausedPosX_Old = float( 0.0 )
+		self.svgPausedPosY_Old = float( 0.0 )	
+		
+		#New values to write to file:
 		self.svgSerialPort = ''
 		self.svgLayer = int( 0 )
 		self.svgNodeCount = int( 0 )
@@ -308,13 +325,15 @@ class WCB( inkex.Effect ):
 		self.svgPausedPosX = float( 0.0 )
 		self.svgPausedPosY = float( 0.0 )	
 		
+				
 		self.backlashStepsX = int(0)
 		self.backlashStepsY = int(0)	 
 		self.XBacklashFlag = True
 		self.YBacklashFlag = True
 		
 		self.paintdist = 0.0
-		self.ReInkingNow = False 
+		self.ReInkingNow = False
+		self.reInkDist = 10
 		self.CleaningNow = False
 		self.manConfMode = False
 		self.PrintFromLayersTab = False
@@ -340,14 +359,17 @@ class WCB( inkex.Effect ):
 		# which elements have received a warning
 		self.warnings = {}
 			
+		self.preResumeMove = False
  
 	def effect( self ):
 		'''Main entry point: check to see which tab is selected, and act accordingly.'''
 
 		self.svg = self.document.getroot()
 		self.CheckSVGforWCBData()
-
+		useOldResumeData = True
+		
 		if self.options.tab == '"splash"': 
+			useOldResumeData = False
 			self.PrintFromLayersTab = False
 			self.plotCurrentLayer = True
 			self.WCBOpenSerial()
@@ -359,15 +381,19 @@ class WCB( inkex.Effect ):
 			self.plotToWCB()
 
 		elif self.options.tab == '"resume"':
+			useOldResumeData = False
 			self.WCBOpenSerial()
 			self.setPaintingMode()
 			unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
 			self.resumePlotSetup()
 			if self.resumeMode:
-				self.fX = self.svgPausedPosX + wcb_conf.F_StartPos_X
-				self.fY = self.svgPausedPosY + wcb_conf.F_StartPos_Y
+				self.fX = self.svgPausedPosX_Old + wcb_conf.F_StartPos_X
+				self.fY = self.svgPausedPosY_Old + wcb_conf.F_StartPos_Y
  				self.resumeMode = False
-				self.plotLineAndTime(self.fX, self.fY) 
+ 				
+ 				self.preResumeMove = True
+				self.plotLineAndTime(self.fX, self.fY) #Special pre-resume move
+				self.preResumeMove = False
 				self.resumeMode = True
 # 				self.svgLastKnownPosX = self.fX
 # 				self.svgLastKnownPosY = self.fY
@@ -382,11 +408,24 @@ class WCB( inkex.Effect ):
 				self.plotLineAndTime(self.fX, self.fY)  
 # 				self.svgLastKnownPosX = self.fX
 # 				self.svgLastKnownPosY = self.fY 
+
+				#New values to write to file:
+				self.svgNodeCount = self.svgNodeCount_Old
+				self.svgLastPath = self.svgLastPath_Old 
+				self.svgLastPathNC = self.svgLastPathNC_Old 
+				self.svgPausedPosX = self.svgPausedPosX_Old 
+				self.svgPausedPosY = self.svgPausedPosY_Old
+				self.svgLayer = self.svgLayer_Old 				
+#  	 			self.svgLastKnownPosX = self.svgLastKnownPosX_Old
+#  				self.svgLastKnownPosY = self.svgLastKnownPosY_Old 
+ 
+
+
 			else:
 				inkex.errormsg( gettext.gettext( "Truly sorry, there does not seem to be any in-progress plot to resume." ) )
 
-
-		elif self.options.tab == '"layers"': 
+		elif self.options.tab == '"layers"':
+			useOldResumeData = False 
 			self.PrintFromLayersTab = True
 			self.plotCurrentLayer = False
 			self.LayersFoundToPlot = False
@@ -403,33 +442,43 @@ class WCB( inkex.Effect ):
 		elif self.options.tab == '"setup"':
 			self.WCBOpenSerial()
 			self.setupCommand()
-
+			
 		elif self.options.tab == '"manual"':
 			self.WCBOpenSerial()
 			self.manualCommand()
 
+		if (useOldResumeData):	
+			self.svgNodeCount = self.svgNodeCount_Old
+			self.svgLastPath = self.svgLastPath_Old 
+			self.svgLastPathNC = self.svgLastPathNC_Old 
+			self.svgPausedPosX = self.svgPausedPosX_Old 
+			self.svgPausedPosY = self.svgPausedPosY_Old
+			self.svgLayer = self.svgLayer_Old 				
+			self.svgLastKnownPosX = self.svgLastKnownPosX_Old
+			self.svgLastKnownPosY = self.svgLastKnownPosY_Old 
 
 		self.svgDataRead = False
 		self.UpdateSVGWCBData( self.svg )
 		self.WCBCloseSerial()
 		return
-
-
-					
+		
+		
+	
 	def resumePlotSetup( self ):
 		self.LayerFound = False
-		if ( self.svgLayer < 101 ) and ( self.svgLayer >= 0 ):
-			self.options.layernumber = self.svgLayer 
+		if ( self.svgLayer_Old < 101 ) and ( self.svgLayer_Old >= 0 ):
+			self.options.layernumber = self.svgLayer_Old 
 			self.PrintFromLayersTab = True
 			self.plotCurrentLayer = False
 			self.LayerFound = True
-		elif ( self.svgLayer == 12345 ):  # Plot all layers 
+		elif ( self.svgLayer_Old == 12345 ):  # Plot all layers 
 			self.PrintFromLayersTab = False
 			self.plotCurrentLayer = True
 			self.LayerFound = True 	
 		if ( self.LayerFound ):
-			if ( self.svgNodeCount > 0 ):
-				self.nodeTarget = self.svgNodeCount
+			if ( self.svgNodeCount_Old > 0 ):
+				self.nodeTarget = self.svgNodeCount_Old
+				self.svgLayer = self.svgLayer_Old
 				if self.options.resumeType == "ResumeNow":
 					self.resumeMode = True
 				if self.serialPort is None:
@@ -438,8 +487,8 @@ class WCB( inkex.Effect ):
 				self.penUp() 
 				self.sendEnableMotors() #Set plotting resolution  
 				self.fSpeed = self.options.penUpSpeed
-				self.fCurrX = self.svgLastKnownPosX + wcb_conf.F_StartPos_X
-				self.fCurrY = self.svgLastKnownPosY + wcb_conf.F_StartPos_Y
+				self.fCurrX = self.svgLastKnownPosX_Old + wcb_conf.F_StartPos_X
+				self.fCurrY = self.svgLastKnownPosY_Old + wcb_conf.F_StartPos_Y
 				 
 
 	def CheckSVGforWCBData( self ):
@@ -469,15 +518,15 @@ class WCB( inkex.Effect ):
 					self.recursiveWCBDataScan( node )
 				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
 					try:
-						self.svgSerialPort = node.get( 'serialport' )
-						self.svgLayer = int( node.get( 'layer' ) )
-						self.svgNodeCount = int( node.get( 'node' ) )
-						self.svgLastPath = int( node.get( 'lastpath' ) )
-						self.svgLastPathNC = int( node.get( 'lastpathnc' ) )
-						self.svgLastKnownPosX = float( node.get( 'lastknownposx' ) )
-						self.svgLastKnownPosY = float( node.get( 'lastknownposy' ) ) 
-						self.svgPausedPosX = float( node.get( 'pausedposx' ) )
-						self.svgPausedPosY = float( node.get( 'pausedposy' ) ) 
+						self.svgSerialPort_Old = node.get( 'serialport' )
+						self.svgLayer_Old = int( node.get( 'layer' ) )
+						self.svgNodeCount_Old = int( node.get( 'node' ) )
+						self.svgLastPath_Old = int( node.get( 'lastpath' ) )
+						self.svgLastPathNC_Old = int( node.get( 'lastpathnc' ) )
+						self.svgLastKnownPosX_Old = float( node.get( 'lastknownposx' ) )
+						self.svgLastKnownPosY_Old = float( node.get( 'lastknownposy' ) ) 
+						self.svgPausedPosX_Old = float( node.get( 'pausedposx' ) )
+						self.svgPausedPosY_Old = float( node.get( 'pausedposy' ) ) 
 						self.svgDataRead = True
 					except:
 						pass
@@ -653,13 +702,25 @@ class WCB( inkex.Effect ):
 
 
 	def PaintToolChange(self, color):   # Move Brush to certain paint color and ink the brush
+# 		if (self.resumeMode):	#simulation only
+# 			self.BrushColor = color 
+# 			self.paintdist = 0.0
+# 		else:
 		if (self.options.autoChange):
+# 			inkex.errormsg( 'About to clean brush at node#: ' + str( self.nodeCount ) + '.' )  
 			self.CleanBrush()
+# 			inkex.errormsg( 'Begin color change to color#: ' + str( color ) + '.' )  
+
 			if (color != 0):
 				self.MoveToPaint(color - 1)
 				self.PaintSwirl(wcb_conf.InkCycles, wcb_conf.InkDelta[0], wcb_conf.InkDelta[1]) 
 			self.BrushColor = color 
+			if ((color != 0) and (self.options.PostDipEnable)):
+					self.MoveToWater(0)
+					self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
 			self.paintdist = 0.0
+# 			inkex.errormsg( 'Finished ink change at node#: ' + str( self.nodeCount ) + '.' )  
+
 		else:
 			if (self.BrushColor < 0):  # if we have not previously inked the brush
 				self.BrushColor = 0
@@ -778,7 +839,7 @@ class WCB( inkex.Effect ):
 			if ( vinfo[2] != 0 ) and ( vinfo[3] != 0 ):
 				sx = self.svgWidth / float( vinfo[2] )
 				sy = self.svgHeight / float( vinfo[3] )
-				self.svgTransform = parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1] ) ) )
+				self.svgTransform = parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1])))
 
 		self.ServoSetup()
 		self.sendEnableMotors() #Set plotting resolution
@@ -803,17 +864,23 @@ class WCB( inkex.Effect ):
 				self.fY = self.ptFirst[1] 
  				self.nodeCount = self.nodeTarget    
 				self.plotLineAndTime(self.fX, self.fY ) 
-# 				self.moveHome()	 
-			#inkex.errormsg('Final node count: ' + str(self.svgNodeCount))  #Node Count - Debug option
-			if ( not self.bStopped ):  #Clear saved position data from SVG file.
-				self.svgLayer = 0
-				self.svgNodeCount = 0
-				self.svgLastPath = 0
-				self.svgLastPathNC = 0
-				self.svgLastKnownPosX = 0
-				self.svgLastKnownPosY = 0
-				self.svgPausedPosX = 0
-				self.svgPausedPosY = 0
+				# 				self.moveHome()	 
+			if ( not self.bStopped ): 
+				if (self.options.tab == '"splash"') or (self.options.tab == '"layers"') or (self.options.tab == '"resume"'):
+					self.svgLayer = 0
+					self.svgNodeCount = 0
+					self.svgLastPath = 0
+					self.svgLastPathNC = 0
+					self.svgLastKnownPosX = 0
+					self.svgLastKnownPosY = 0
+					self.svgPausedPosX = 0
+					self.svgPausedPosY = 0
+					#We are clearing saved position data from the SVG file, IF
+					#  we have completed a normal plot from the splash, layer, or resume tabs.
+
+					  
+
+
 
 		finally:
 			# We may have had an exception and lost the serial port...
@@ -887,38 +954,35 @@ class WCB( inkex.Effect ):
 
 			elif node.tag == inkex.addNS( 'path', 'svg' ):
 
-				self.pathcount += 1
-
 				# if we're in resume mode AND self.pathcount < self.svgLastPath,
 				#    then skip over this path.
 				# if we're in resume mode and self.pathcount = self.svgLastPath,
-				#    then start here, and set
-				# self.nodeCount equal to self.svgLastPathNC
+				#    then start here, and set self.nodeCount equal to self.svgLastPathNC
 				
-				if self.resumeMode and ( self.pathcount == self.svgLastPath ):
-					self.nodeCount = self.svgLastPathNC
-				if self.resumeMode and ( self.pathcount < self.svgLastPath ):
-					pass
+				doWePlotThisPath = False 
+				if (self.resumeMode): 
+					if (self.pathcount < self.svgLastPath_Old ): 
+						#This path was *completely plotted* already; skip.
+						self.pathcount += 1 
+					elif (self.pathcount == self.svgLastPath_Old ): 
+						#this path is the first *not completely* plotted path:
+						self.nodeCount =  self.svgLastPathNC_Old	#Nodecount after last completed path
+						doWePlotThisPath = True 
 				else:
+					doWePlotThisPath = True
+				if (doWePlotThisPath):
+					self.pathcount += 1
 					self.plotPath( node, matNew )
-					if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-						self.svgLastPath += 1	#The number of the last path completed
-						self.svgLastPathNC = self.nodeCount #the node count after the last path was completed.
-
+				
 			elif node.tag == inkex.addNS( 'rect', 'svg' ) or node.tag == 'rect':
 
-				# Manually transform
-				#
-				#    <rect x="X" y="Y" width="W" height="H"/>
-				#
-				# into
-				#
-				#    <path d="MX,Y lW,0 l0,H l-W,0 z"/>
-				#
+				# Manually transform 
+				#    <rect x="X" y="Y" width="W" height="H"/> 
+				# into 
+				#    <path d="MX,Y lW,0 l0,H l-W,0 z"/> 
 				# I.e., explicitly draw three sides of the rectangle and the
 				# fourth side implicitly
 
-				self.pathcount += 1
 				 
 				# if we're in resume mode AND self.pathcount < self.svgLastPath,
 				#    then skip over this path.
@@ -926,11 +990,19 @@ class WCB( inkex.Effect ):
 				#    then start here, and set
 				# self.nodeCount equal to self.svgLastPathNC
 				
-				if self.resumeMode and ( self.pathcount == self.svgLastPath ):
-					self.nodeCount = self.svgLastPathNC
-				if self.resumeMode and ( self.pathcount < self.svgLastPath ):
-					pass
+				doWePlotThisPath = False 
+				if (self.resumeMode): 
+					if (self.pathcount < self.svgLastPath_Old ): 
+						#This path was *completely plotted* already; skip.
+						self.pathcount += 1 
+					elif (self.pathcount == self.svgLastPath_Old ): 
+						#this path is the first *not completely* plotted path:
+						self.nodeCount =  self.svgLastPathNC_Old	#Nodecount after last completed path
+						doWePlotThisPath = True 
 				else:
+					doWePlotThisPath = True
+				if (doWePlotThisPath):
+					self.pathcount += 1
 					# Create a path with the outline of the rectangle
 					newpath = inkex.etree.Element( inkex.addNS( 'path', 'svg' ) )
 					x = float( node.get( 'x' ) )
@@ -951,11 +1023,7 @@ class WCB( inkex.Effect ):
 					a.append( [' Z', []] )
 					newpath.set( 'd', simplepath.formatPath( a ) )
 					self.plotPath( newpath, matNew )
-					if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-						self.svgLastPath += 1
-						self.svgLastPathNC = self.nodeCount
-
-
+					
 			elif node.tag == inkex.addNS( 'line', 'svg' ) or node.tag == 'line':
 
 				# Convert
@@ -966,18 +1034,25 @@ class WCB( inkex.Effect ):
 				#
 				#   <path d="MX1,Y1 LX2,Y2"/>
 
-				self.pathcount += 1
 				# if we're in resume mode AND self.pathcount < self.svgLastPath,
 				#    then skip over this path.
 				# if we're in resume mode and self.pathcount = self.svgLastPath,
 				#    then start here, and set
 				# self.nodeCount equal to self.svgLastPathNC
 
-				if self.resumeMode and ( self.pathcount == self.svgLastPath ):
-					self.nodeCount = self.svgLastPathNC
-				if self.resumeMode and ( self.pathcount < self.svgLastPath ):
-					pass
+				doWePlotThisPath = False 
+				if (self.resumeMode): 
+					if (self.pathcount < self.svgLastPath_Old ): 
+						#This path was *completely plotted* already; skip.
+						self.pathcount += 1 
+					elif (self.pathcount == self.svgLastPath_Old ): 
+						#this path is the first *not completely* plotted path:
+						self.nodeCount =  self.svgLastPathNC_Old	#Nodecount after last completed path
+						doWePlotThisPath = True 
 				else:
+					doWePlotThisPath = True
+				if (doWePlotThisPath):
+					self.pathcount += 1
 					# Create a path to contain the line
 					newpath = inkex.etree.Element( inkex.addNS( 'path', 'svg' ) )
 					x1 = float( node.get( 'x1' ) )
@@ -995,38 +1070,38 @@ class WCB( inkex.Effect ):
 					a.append( [' L ', [x2, y2]] )
 					newpath.set( 'd', simplepath.formatPath( a ) )
 					self.plotPath( newpath, matNew )
-					if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-						self.svgLastPath += 1
-						self.svgLastPathNC = self.nodeCount
+					
 
 			elif node.tag == inkex.addNS( 'polyline', 'svg' ) or node.tag == 'polyline':
 
 				# Convert
-				#
-				#  <polyline points="x1,y1 x2,y2 x3,y3 [...]"/>
-				#
-				# to
-				#
-				#   <path d="Mx1,y1 Lx2,y2 Lx3,y3 [...]"/>
-				#
+				#  <polyline points="x1,y1 x2,y2 x3,y3 [...]"/> 
+				# to 
+				#   <path d="Mx1,y1 Lx2,y2 Lx3,y3 [...]"/> 
 				# Note: we ignore polylines with no points
 
 				pl = node.get( 'points', '' ).strip()
 				if pl == '':
 					pass
 
-				self.pathcount += 1
 				#if we're in resume mode AND self.pathcount < self.svgLastPath, then skip over this path.
 				#if we're in resume mode and self.pathcount = self.svgLastPath, then start here, and set
 				# self.nodeCount equal to self.svgLastPathNC
-
-				if self.resumeMode and ( self.pathcount == self.svgLastPath ):
-					self.nodeCount = self.svgLastPathNC
-
-				if self.resumeMode and ( self.pathcount < self.svgLastPath ):
-					pass
-
+				
+				doWePlotThisPath = False 
+				if (self.resumeMode): 
+					if (self.pathcount < self.svgLastPath_Old ): 
+						#This path was *completely plotted* already; skip.
+						self.pathcount += 1 
+					elif (self.pathcount == self.svgLastPath_Old ): 
+						#this path is the first *not completely* plotted path:
+						self.nodeCount =  self.svgLastPathNC_Old	#Nodecount after last completed path
+						doWePlotThisPath = True 
 				else:
+					doWePlotThisPath = True
+				if (doWePlotThisPath):
+					self.pathcount += 1
+					
 					pa = pl.split()
 					if not len( pa ):
 						pass
@@ -1046,38 +1121,37 @@ class WCB( inkex.Effect ):
 					if t:
 						newpath.set( 'transform', t )
 					self.plotPath( newpath, matNew )
-					if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-						self.svgLastPath += 1
-						self.svgLastPathNC = self.nodeCount
 
 			elif node.tag == inkex.addNS( 'polygon', 'svg' ) or node.tag == 'polygon':
 
-				# Convert
-				#
-				#  <polygon points="x1,y1 x2,y2 x3,y3 [...]"/>
-				#
-				# to
-				#
-				#   <path d="Mx1,y1 Lx2,y2 Lx3,y3 [...] Z"/>
-				#
+				# Convert 
+				#  <polygon points="x1,y1 x2,y2 x3,y3 [...]"/> 
+				# to 
+				#   <path d="Mx1,y1 Lx2,y2 Lx3,y3 [...] Z"/> 
 				# Note: we ignore polygons with no points
 
 				pl = node.get( 'points', '' ).strip()
 				if pl == '':
 					pass
 
-				self.pathcount += 1
 				#if we're in resume mode AND self.pathcount < self.svgLastPath, then skip over this path.
 				#if we're in resume mode and self.pathcount = self.svgLastPath, then start here, and set
 				# self.nodeCount equal to self.svgLastPathNC
 
-				if self.resumeMode and ( self.pathcount == self.svgLastPath ):
-					self.nodeCount = self.svgLastPathNC
-
-				if self.resumeMode and ( self.pathcount < self.svgLastPath ):
-					pass
-
+				doWePlotThisPath = False 
+				if (self.resumeMode): 
+					if (self.pathcount < self.svgLastPath_Old ): 
+						#This path was *completely plotted* already; skip.
+						self.pathcount += 1 
+					elif (self.pathcount == self.svgLastPath_Old ): 
+						#this path is the first *not completely* plotted path:
+						self.nodeCount =  self.svgLastPathNC_Old	#Nodecount after last completed path
+						doWePlotThisPath = True 
 				else:
+					doWePlotThisPath = True
+				if (doWePlotThisPath):
+					self.pathcount += 1
+					
 					pa = pl.split()
 					if not len( pa ):
 						pass
@@ -1098,29 +1172,20 @@ class WCB( inkex.Effect ):
 					if t:
 						newpath.set( 'transform', t )
 					self.plotPath( newpath, matNew )
-					if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-						self.svgLastPath += 1
-						self.svgLastPathNC = self.nodeCount
-
+					
 			elif node.tag == inkex.addNS( 'ellipse', 'svg' ) or \
 				node.tag == 'ellipse' or \
 				node.tag == inkex.addNS( 'circle', 'svg' ) or \
 				node.tag == 'circle':
 
 					# Convert circles and ellipses to a path with two 180 degree arcs.
-					# In general (an ellipse), we convert
-					#
-					#   <ellipse rx="RX" ry="RY" cx="X" cy="Y"/>
-					#
-					# to
-					#
-					#   <path d="MX1,CY A RX,RY 0 1 0 X2,CY A RX,RY 0 1 0 X1,CY"/>
-					#
-					# where
-					#
+					# In general (an ellipse), we convert 
+					#   <ellipse rx="RX" ry="RY" cx="X" cy="Y"/> 
+					# to 
+					#   <path d="MX1,CY A RX,RY 0 1 0 X2,CY A RX,RY 0 1 0 X1,CY"/> 
+					# where 
 					#   X1 = CX - RX
-					#   X2 = CX + RX
-					#
+					#   X2 = CX + RX 
 					# Note: ellipses or circles with a radius attribute of value 0 are ignored
 
 					if node.tag == inkex.addNS( 'ellipse', 'svg' ) or node.tag == 'ellipse':
@@ -1132,18 +1197,25 @@ class WCB( inkex.Effect ):
 					if rx == 0 or ry == 0:
 						pass
 
-					self.pathcount += 1
+					
 					#if we're in resume mode AND self.pathcount < self.svgLastPath, then skip over this path.
 					#if we're in resume mode and self.pathcount = self.svgLastPath, then start here, and set
 					# self.nodeCount equal to self.svgLastPathNC
-
-					if self.resumeMode and ( self.pathcount == self.svgLastPath ):
-						self.nodeCount = self.svgLastPathNC
-
-					if self.resumeMode and ( self.pathcount < self.svgLastPath ):
-						pass
-
+					
+					doWePlotThisPath = False 
+					if (self.resumeMode): 
+						if (self.pathcount < self.svgLastPath_Old ): 
+							#This path was *completely plotted* already; skip.
+							self.pathcount += 1 
+						elif (self.pathcount == self.svgLastPath_Old ): 
+							#this path is the first *not completely* plotted path:
+							self.nodeCount =  self.svgLastPathNC_Old	#Nodecount after last completed path
+							doWePlotThisPath = True 
 					else:
+						doWePlotThisPath = True
+					if (doWePlotThisPath):
+						self.pathcount += 1
+					
 						cx = float( node.get( 'cx', '0' ) )
 						cy = float( node.get( 'cy', '0' ) )
 						x1 = cx - rx
@@ -1162,9 +1234,7 @@ class WCB( inkex.Effect ):
 						if t:
 							newpath.set( 'transform', t )
 						self.plotPath( newpath, matNew )
-						if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-							self.svgLastPath += 1
-							self.svgLastPathNC = self.nodeCount
+						
 							
 			elif node.tag == inkex.addNS( 'metadata', 'svg' ) or node.tag == 'metadata':
 				pass
@@ -1332,13 +1402,17 @@ class WCB( inkex.Effect ):
 				if self.plotCurrentLayer:
 					self.plotLineAndTime(self.fX, self.fY )   #Draw a segment
 					
-					
+		if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
+			self.svgLastPath = self.pathcount #The number of the last path completed
+			self.svgLastPathNC = self.nodeCount #the node count after the last path was completed.			
+			
+
 	def plotLineAndTime( self, xDest, yDest ):
 		'''
 		Send commands out the com port as a line segment (dx, dy) and a time (ms) the segment
 		should take to implement.  
-		Important note: Everything up to this point uses in *pixel* scale. 
-		Here, we convert from floating-point pixel scale to actual motor steps, w/ current DPI.
+		Important note: Everything up to this point uses *pixel* scale. 
+		Here, we convert from floating-point pixel scale to actual motor steps, w/ present DPI.
 		'''
 		
 		maxSegmentDuration = 250.0  # Maximum time to spend painting a given segment
@@ -1375,11 +1449,22 @@ class WCB( inkex.Effect ):
 
 		if ( distance( nDeltaX, nDeltaY ) > 0 ):
 			self.nodeCount += 1
+# 			inkex.errormsg( 'Nodecount: ' + str( self.nodeCount ) + '.' )
+# 			if (self.preResumeMove == True ):
+# 				inkex.errormsg( '--- at PreResume Move. ')
+
 
 			if self.resumeMode:
 				if ( self.nodeCount >= self.nodeTarget ):
 					self.resumeMode = False
-					inkex.errormsg('First node plotted will be number: ' + str(self.nodeCount))
+					self.paintdist = 0
+#  					inkex.errormsg('Resume turned off at node #: ' + str(self.nodeCount))
+#  					inkex.errormsg( 'self.ReInkingNow: ' + str( self.ReInkingNow) + '.' ) 
+#  					inkex.errormsg('reInkEnable : ' + str(self.options.reInkEnable))
+#  					inkex.errormsg( 'self.reInkDist: ' + str(self.reInkDist) + '.' ) 
+
+
+					
 					if ( not self.virtualPenIsUp ):
 						self.penDown()
 						self.fSpeed = self.BrushDownSpeed
@@ -1392,7 +1477,7 @@ class WCB( inkex.Effect ):
 				# Put re-inking *before* the movement here, so that we only do it if there's more painting. 
 				if (self.ReInkingNow == False):
 					if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
-						if (self.paintdist > self.options.reInkDist): 
+						if (self.paintdist > self.reInkDist):
 							self.reInkBrush() 
 			
 				xd = 0
@@ -1410,7 +1495,7 @@ class WCB( inkex.Effect ):
 					   td = 1		# don't allow zero-time moves.
 
 							
-				if (not self.resumeMode):
+				if (not self.resumeMode) and (not self.bStopped):
 					if ( self.options.revMotor1 ):
 						xd2 = -xd
 					else:
@@ -1434,19 +1519,15 @@ class WCB( inkex.Effect ):
 					if ((yd2 > 0) and self.YBacklashFlag):
 						self.YBacklashFlag = False
 						yd2 += self.backlashStepsY		
-												
 						
-					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r'
+					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!
 
 					self.doCommand( strOutput )
 					self.fCurrX += xd / self.stepsPerPx   # Update current position
 					self.fCurrY += yd / self.stepsPerPx		
 
 					self.svgLastKnownPosX = self.fCurrX - wcb_conf.F_StartPos_X
-					self.svgLastKnownPosY = self.fCurrY - wcb_conf.F_StartPos_Y				
-					
-# 					self.svgLastKnownPosX += xd / self.stepsPerPx
-# 					self.svgLastKnownPosY += yd / self.stepsPerPx
+					self.svgLastKnownPosY = self.fCurrY - wcb_conf.F_StartPos_Y	
 					
 					if (self.ReInkingNow == False):
 						if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
@@ -1462,7 +1543,6 @@ class WCB( inkex.Effect ):
 				self.svgPausedPosX = self.fCurrX - wcb_conf.F_StartPos_X	#self.svgLastKnownPosX
 				self.svgPausedPosY = self.fCurrY - wcb_conf.F_StartPos_Y	#self.svgLastKnownPosY
 			
-				
 				inkex.errormsg( 'Plot paused by button press after segment number ' + str( self.nodeCount ) + '.' )
 				inkex.errormsg( 'Use the "Resume" feature to continue.' )
 				self.bStopped = True
@@ -1485,7 +1565,10 @@ class WCB( inkex.Effect ):
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 360.0 )
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 4
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 4
-		self.options.reInkDist = self.options.reInkDist * 90 * self.stepsPerPx # in motor steps
+		self.reInkDist = self.options.reInkDist * 90 * self.stepsPerPx # in motor steps
+
+		
+		
 		# Motor steps for backlash compensation:
 		# self.options.backlashX is in mils, need to calculate how many steps that is.
 		# self.options.backlashX * (1 inch/1000 mils) * (90 px/1 inch) * self.stepsPerPx
@@ -1663,8 +1746,9 @@ class WCB( inkex.Effect ):
 		# Before searching, first check to see if the last known
 		# serial port is still good.
 
-		serialPort = self.testSerialPort( self.svgSerialPort )
+		serialPort = self.testSerialPort( self.svgSerialPort_Old )
 		if serialPort:
+			self.svgSerialPort = self.svgSerialPort_Old
 			return serialPort
 
 		# Try any devices which seem to have EBB boards attached

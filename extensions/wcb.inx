@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
   <_name>WaterColorBot Control</_name>
-  <id>command.evilmadscientist.wcb.plot_reva39</id>
+  <id>command.evilmadscientist.wcb.plot_reva42</id>
   <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
   <dependency type="executable" location="extensions">wcb.py</dependency>
   <dependency type="executable" location="extensions">inkex.py</dependency>
@@ -80,8 +80,10 @@ WaterColorBot: Basic Setup
     <page name='options' _gui-text='Options'>
       <param name="reInkDist" type="float" min="0" max="500" 
            _gui-text="          Re-ink distance (inches):">12.0</param> 
+<!--
       <param name="LeadInDist" type="float" min="0" max="2" 
            _gui-text="  Lead-in after re-inking (inches):">0.20</param>  
+-->
 
       <_param name="instructions_options1" type="description"
 	      xml:space="preserve">
