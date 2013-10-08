@@ -2,7 +2,9 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 0.1 (Rev A42), dated 10/5/2013
+# Version 0.9 (Rev A45), dated 10/7/2013
+#
+# Copyright 2013 Windell H. Oskay, Evil Mad Scientist Laboratories
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -225,14 +227,14 @@ class WCB( inkex.Effect ):
 			action="store", type="float",
 			dest="smoothness", default=.2,
 			help="Smoothness of curves" ) 			
-		self.OptionParser.add_option( "--backlashX",
-			action="store", type="float",
-			dest="backlashX", default=0.0,
-			help="Backlash compensation, X direction" ) 					
-		self.OptionParser.add_option( "--backlashY",
-			action="store", type="float",
-			dest="backlashY", default=0.0,
-			help="Backlash compensation, Y direction" ) 			 
+# 		self.OptionParser.add_option( "--backlashX",
+# 			action="store", type="float",
+# 			dest="backlashX", default=0.0,
+# 			help="Backlash compensation, X direction" ) 					
+# 		self.OptionParser.add_option( "--backlashY",
+# 			action="store", type="float",
+# 			dest="backlashY", default=0.0,
+# 			help="Backlash compensation, Y direction" ) 			 
 			
 		self.OptionParser.add_option( "--resolution",
 			action="store", type="int",
@@ -295,6 +297,7 @@ class WCB( inkex.Effect ):
 		self.bStopped = False
 		self.fSpeed = 1
 		self.resumeMode = False
+		self.stripData = False
 		self.nodeCount = int( 0 )		#NOTE: python uses 32-bit ints.
 		self.nodeTarget = int( 0 )
 		self.pathcount = int( 0 )
@@ -304,6 +307,7 @@ class WCB( inkex.Effect ):
 		
 		#Values read from file:
 		self.svgSerialPort_Old = ''
+		self.svgLayer_Old = int( 0 )
 		self.svgNodeCount_Old = int( 0 )
 		self.svgDataRead_Old = False
 		self.svgLastPath_Old = int( 0 )
@@ -369,6 +373,7 @@ class WCB( inkex.Effect ):
 		useOldResumeData = True
 		
 		if self.options.tab == '"splash"': 
+			self.LayersFoundToPlot = False
 			useOldResumeData = False
 			self.PrintFromLayersTab = False
 			self.plotCurrentLayer = True
@@ -379,6 +384,11 @@ class WCB( inkex.Effect ):
 			self.svgLayer = 12345;  # indicate (to resume routine) that we are plotting all layers.
 			self.setPaintingMode()
 			self.plotToWCB()
+			
+			if ( self.LayersFoundToPlot == False ):
+				inkex.errormsg( gettext.gettext( 'Truly sorry; I did not find any numbered layers to paint.  You may want to use the "Snap Colors to Layers" extension, or read up on the documentation.' ) )
+			
+			
 
 		elif self.options.tab == '"resume"':
 			useOldResumeData = False
@@ -437,7 +447,7 @@ class WCB( inkex.Effect ):
 			self.svgLayer = self.options.layernumber
 			self.plotToWCB()
 			if ( self.LayersFoundToPlot == False ):
-				inkex.errormsg( gettext.gettext( "Truly sorry, but I did not find any numbered layers to plot." ) )
+				inkex.errormsg( gettext.gettext( 'Truly sorry; I did not find any numbered layers to paint.  You may want to use the "Snap Colors to Layers" extension, or read up on the documentation.' ) )
 
 		elif self.options.tab == '"setup"':
 			self.WCBOpenSerial()
@@ -460,6 +470,13 @@ class WCB( inkex.Effect ):
 		self.svgDataRead = False
 		self.UpdateSVGWCBData( self.svg )
 		self.WCBCloseSerial()
+		
+		if (self.stripData):
+			for node in self.svg.xpath( '//svg:WCB', namespaces=inkex.NSS ):
+				self.svg.remove( node )
+			for node in self.svg.xpath( '//svg:eggbot', namespaces=inkex.NSS ):
+				self.svg.remove( node )
+			inkex.errormsg( gettext.gettext( "I've removed all WaterColorBot data from this Inkscape file. Have a great day!" ) )	
 		return
 		
 		
@@ -494,23 +511,18 @@ class WCB( inkex.Effect ):
 	def CheckSVGforWCBData( self ):
 		self.svgDataRead = False
 		self.recursiveWCBDataScan( self.svg )
-# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
 		if ( not self.svgDataRead ):    #if there is no WCB data, add some:
 			WCBlayer = inkex.etree.SubElement( self.svg, 'WCB' )
 			WCBlayer.set( 'serialport', '' )
 			WCBlayer.set( 'layer', str( 0 ) )
-			WCBlayer.set( 'node', str( 0 ) )
-			WCBlayer.set( 'lastpath', str( 0 ) )
-			WCBlayer.set( 'lastpathnc', str( 0 ) )
+			WCBlayer.set( 'node', str( 0 ) )			#node paused at, if saved in paused state
+			WCBlayer.set( 'lastpath', str( 0 ) )		#Last path number that has been fully painted
+			WCBlayer.set( 'lastpathnc', str( 0 ) )		#Node count as of finishing last path.
 			WCBlayer.set( 'lastknownposx', str( 0 ) )  #Last known position of carriage
 			WCBlayer.set( 'lastknownposy', str( 0 ) )
 			WCBlayer.set( 'pausedposx', str( 0 ) )	   #The position of the carriage when "pause" was pressed.
 			WCBlayer.set( 'pausedposy', str( 0 ) )
 						
-# 		inkex.errormsg('self.svgDataRead: ' + str(self.svgDataRead)) 
-# 		inkex.errormsg('self.svgLastKnownPosX: ' + str(self.svgLastKnownPosX)) 
-# 		inkex.errormsg('self.svgLastKnownPosY: ' + str(self.svgLastKnownPosY)) 
-
 	def recursiveWCBDataScan( self, aNodeList ):
 		if ( not self.svgDataRead ):
 			for node in aNodeList:
@@ -550,10 +562,7 @@ class WCB( inkex.Effect ):
 					node.set( 'pausedposy', str( (self.svgPausedPosY) ) )
 					
 					self.svgDataRead = True
-					
-					
-									
-
+					 
 	def setupCommand( self ):
 		"""Execute commands from the "setup" tab"""
 
@@ -615,6 +624,9 @@ class WCB( inkex.Effect ):
 		elif self.options.manualType == "version-check":
 			strVersion = self.doRequest( 'v\r' )
 			inkex.errormsg( 'I asked the EBB for its version info, and it replied:\n ' + strVersion )
+
+		elif self.options.manualType == "strip-data":
+			self.stripData = True
 			
 		else:  # self.options.manualType is walk motor:
 			if self.options.manualType == "walk-y-motor":
@@ -706,6 +718,11 @@ class WCB( inkex.Effect ):
 # 			self.BrushColor = color 
 # 			self.paintdist = 0.0
 # 		else:
+
+
+
+		
+		
 		if (self.options.autoChange):
 # 			inkex.errormsg( 'About to clean brush at node#: ' + str( self.nodeCount ) + '.' )  
 			self.CleanBrush()
@@ -721,22 +738,36 @@ class WCB( inkex.Effect ):
 			self.paintdist = 0.0
 # 			inkex.errormsg( 'Finished ink change at node#: ' + str( self.nodeCount ) + '.' )  
 
-		else:
+		else: # Cases with autochange off: 
 			if (self.BrushColor < 0):  # if we have not previously inked the brush
 				self.BrushColor = 0
+				
+# 				inkex.errormsg( 'self.options.reInkEnable: ' + str( self.options.reInkEnable) + '.' )  	
+# 				inkex.errormsg( 'self.options.ReWetOnly: ' + str( self.options.ReWetOnly) + '.' )  
+# 				inkex.errormsg( 'self.options.PreDipEnable: ' + str( self.options.PreDipEnable) + '.' )  	
+# 				inkex.errormsg( 'self.options.PostDipEnable: ' + str( self.options.PostDipEnable) + '.' )  
+						
+										
 				if ((self.options.reInkEnable) and (self.options.ReWetOnly == False)): # if we are using paint
-					if (self.options.PreDipEnable or self.options.PostDipEnable): #if we are using water
+					if (self.options.PreDipEnable or self.options.PostDipEnable): #Using Paint AND water
 						self.CleanBrush()
 						self.MoveToPaint(0)
-						self.PaintSwirl(wcb_conf.InkCycles, wcb_conf.InkDelta[0], wcb_conf.InkDelta[1]) 
+						self.BrushColor = 1		#Color 1, black ink
+						self.PaintSwirl(1, wcb_conf.InkReDelta[0], wcb_conf.InkReDelta[1]) 
 						if (self.options.PostDipEnable):
 							self.MoveToWater(0)
 							self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])						
 					else: #using paint but not using water	
 						self.MoveToPaint(0)
-						self.PaintSwirl(wcb_conf.InkCycles, wcb_conf.InkDelta[0], wcb_conf.InkDelta[1]) 				
+						self.BrushColor = 1 	#color 1, black ink
+						self.PaintSwirl(1, wcb_conf.InkReDelta[0], wcb_conf.InkReDelta[1]) 	
+# 						inkex.errormsg( 'self.options.paintMode @ Toolchange: ' + str( self.options.paintMode) + '.' )  	
+# 						inkex.errormsg( 'self.options.ReWetOnly: ' + str( self.options.ReWetOnly) + '.' )  
+# 						inkex.errormsg( 'self.BrushColor: ' + str( self.BrushColor) + '.' )   
+											
 				elif ((self.options.reInkEnable) and (self.options.ReWetOnly)): # if we are using only water
-					self.CleanBrush()
+					self.MoveToWater(0)		#water dip only
+					self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
 
 		
 	def reInkBrush(self):	
@@ -751,6 +782,12 @@ class WCB( inkex.Effect ):
 		returnToX = self.fCurrX # Save current position, to return to.
 		returnToY = self.fCurrY # Save current position, to return to.
 		
+		
+# 		inkex.errormsg( 'self.options.paintMode: ' + str( self.options.paintMode) + '.' )  
+# 		inkex.errormsg( 'self.options.ReWetOnly: ' + str( self.options.ReWetOnly) + '.' )  
+# 		inkex.errormsg( 'self.BrushColor: ' + str( self.BrushColor) + '.' )   
+		
+		
 		if ((self.options.ReWetOnly) or (self.BrushColor == 0)): 
 			self.MoveToWater(0)
 			self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])   
@@ -763,6 +800,9 @@ class WCB( inkex.Effect ):
 			if (self.options.PostDipEnable):
 				self.MoveToWater(0)
 				self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
+
+
+
 		
  		self.xBoundsMin = returnToXmin
  		self.yBoundsMin = returnToYmin
@@ -781,7 +821,7 @@ class WCB( inkex.Effect ):
 			self.options.ReWetOnly = False
 			self.options.PreDipEnable = True
 			self.options.PostDipEnable = False
-		elif self.options.paintMode == "wc-dip":
+		elif self.options.paintMode == "wc-dip":	#Watercolor + Post-dip
 			self.options.autoChange = True
 			self.options.reInkEnable = True
 			self.options.ReWetOnly = False
@@ -805,6 +845,7 @@ class WCB( inkex.Effect ):
 			self.options.ReWetOnly = False
 			self.options.PreDipEnable = False
 			self.options.PostDipEnable = False
+# 			self.BrushColor = 1
 		elif self.options.paintMode == "pencil":         
 			self.options.autoChange = False
 			self.options.reInkEnable = False
@@ -907,16 +948,39 @@ class WCB( inkex.Effect ):
 			if v == 'hidden' or v == 'collapse':
 				pass
 
-			# first apply the current matrix transform to this node's tranform
+			# first apply the current matrix transform to this node's transform
 			matNew = composeTransform( matCurrent, parseTransform( node.get( "transform" ) ) )
+
+			if (node.getparent() == self.svg):
+				#Handle special case of Top-level object found
+				if node.tag == inkex.addNS( 'g', 'svg' ) or node.tag == 'g':
+					pass #case handled elsewhere
+				elif node.tag == inkex.addNS( 'use', 'svg' ) or node.tag == 'use':
+					pass #case handled elsewhere			
+				else:
+					#only paint if we're not auto-changing colors,
+					# and NOT painting from Layers tab. (Pencil: OK. Watercolors, not so much: use numbered layers, please.)
+
+					self.plotCurrentLayer = False
+					if (self.options.autoChange == False):
+						self.plotCurrentLayer = True
+						
+					if (self.PrintFromLayersTab):
+						self.plotCurrentLayer = False
+			
+					if (self.plotCurrentLayer == True):
+						self.LayersFoundToPlot = True
+			
+			
+						
 
 			if node.tag == inkex.addNS( 'g', 'svg' ) or node.tag == 'g':
 
 				self.penUp()
 				if ( node.get( inkex.addNS( 'groupmode', 'inkscape' ) ) == 'layer' ): 
 					self.DoWePlotLayer( node.get( inkex.addNS( 'label', 'inkscape' ) ) )
-				self.recursivelyTraverseSvg( node, matNew, parent_visibility=v )
-
+				self.recursivelyTraverseSvg( node, matNew, parent_visibility=v )			
+			
 			elif node.tag == inkex.addNS( 'use', 'svg' ) or node.tag == 'use':
 
 				# A <use> element refers to another SVG element via an xlink:href="#blah"
@@ -1349,6 +1413,7 @@ class WCB( inkex.Effect ):
 
 
 
+
 	def plotPath( self, path, matTransform ):
 		'''
 		Plot the path while applying the transformation defined
@@ -1360,9 +1425,9 @@ class WCB( inkex.Effect ):
 		if len( simplepath.parsePath( d ) ) == 0:
 			return
 
-		if (self.BrushColor != self.LayerPaintColor):
+		if (self.BrushColor != self.LayerPaintColor) or (self.BrushColor < 0):
 			self.PaintToolChange(self.LayerPaintColor)
-
+			
 		# reset page bounds for plotting:
 		self.xBoundsMax = wcb_conf.N_PAGE_WIDTH
 		self.xBoundsMin = 0
@@ -1461,8 +1526,7 @@ class WCB( inkex.Effect ):
 #  					inkex.errormsg('Resume turned off at node #: ' + str(self.nodeCount))
 #  					inkex.errormsg( 'self.ReInkingNow: ' + str( self.ReInkingNow) + '.' ) 
 #  					inkex.errormsg('reInkEnable : ' + str(self.options.reInkEnable))
-#  					inkex.errormsg( 'self.reInkDist: ' + str(self.reInkDist) + '.' ) 
-
+#
 
 					
 					if ( not self.virtualPenIsUp ):
@@ -1479,6 +1543,7 @@ class WCB( inkex.Effect ):
 					if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
 						if (self.paintdist > self.reInkDist):
 							self.reInkBrush() 
+
 			
 				xd = 0
 				yd = 0
@@ -1505,20 +1570,20 @@ class WCB( inkex.Effect ):
 					else:
 						yd2 = yd 
 						
-					#Backlash correction: At motor level only; no record kept of its effect on position.	
-					if ((xd2 < 0) and not self.XBacklashFlag):
-						self.XBacklashFlag = True
-						xd2 -= self.backlashStepsX
-					if ((xd2 > 0) and self.XBacklashFlag):
-						self.XBacklashFlag = False
-						xd2 += self.backlashStepsX		
-							
-					if ((yd2 < 0) and not self.YBacklashFlag):
-						self.YBacklashFlag = True
-						yd2 -= self.backlashStepsY
-					if ((yd2 > 0) and self.YBacklashFlag):
-						self.YBacklashFlag = False
-						yd2 += self.backlashStepsY		
+# 					#Backlash correction: At motor level only; no record kept of its effect on position.	
+# 					if ((xd2 < 0) and not self.XBacklashFlag):
+# 						self.XBacklashFlag = True
+# 						xd2 -= self.backlashStepsX
+# 					if ((xd2 > 0) and self.XBacklashFlag):
+# 						self.XBacklashFlag = False
+# 						xd2 += self.backlashStepsX		
+# 							
+# 					if ((yd2 < 0) and not self.YBacklashFlag):
+# 						self.YBacklashFlag = True
+# 						yd2 -= self.backlashStepsY
+# 					if ((yd2 > 0) and self.YBacklashFlag):
+# 						self.YBacklashFlag = False
+# 						yd2 += self.backlashStepsY		
 						
 					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!
 
@@ -1572,8 +1637,10 @@ class WCB( inkex.Effect ):
 		# Motor steps for backlash compensation:
 		# self.options.backlashX is in mils, need to calculate how many steps that is.
 		# self.options.backlashX * (1 inch/1000 mils) * (90 px/1 inch) * self.stepsPerPx
-		self.backlashStepsX = int( round(self.options.backlashX * (0.09 * self.stepsPerPx)))
-		self.backlashStepsY = int( round(self.options.backlashY * (0.09 * self.stepsPerPx)))
+		
+		#self.backlashStepsX = int( round(self.options.backlashX * (0.09 * self.stepsPerPx)))
+		#self.backlashStepsY = int( round(self.options.backlashY * (0.09 * self.stepsPerPx)))
+		
 # 		inkex.errormsg('self.backlashStepsX: ' + str(self.backlashStepsX)) 
 # 		inkex.errormsg('self.backlashStepsY: ' + str(self.backlashStepsY)) 
 

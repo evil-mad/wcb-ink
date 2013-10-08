@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <_name>WaterColorBot Control</_name>
-  <id>command.evilmadscientist.wcb.plot_reva42</id>
+  <_name>Control WaterColorBot</_name>
+  <id>command.evilmadscientist.wcb.plot_reva45</id>
   <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
   <dependency type="executable" location="extensions">wcb.py</dependency>
   <dependency type="executable" location="extensions">inkex.py</dependency>
@@ -14,7 +14,7 @@ Welcome to the WaterColorBot interface!
 1. Make sure that the WaterColorBot Carriage
     is in the START (upper-left) corner.
 
-2.Press 'Apply' to begin plotting!
+2.Press 'Apply' to begin painting!
 
 Need help? Visit http://watercolorbot.com/
 </_param>
@@ -99,10 +99,12 @@ WaterColorBot: Basic Setup
 	<_option value="1">Super, ~900 DPI</_option>
 	<_option value="3">Low, ~225 DPI</_option> 
       </param>
+<!--
            <param name="backlashX" type="float" min="-500" max="500" 
            _gui-text="          Backlash compensation, X (mils):">0</param>      
            <param name="backlashY" type="float" min="-500" max="500" 
-           _gui-text="          Backlash compensation, Y (mils):">0</param>            
+           _gui-text="          Backlash compensation, Y (mils):">0</param>     
+-->       
       <_param name="instructions_options2" type="description"
 	      xml:space="preserve">
 . . . . . . . . . . . . .
@@ -182,6 +184,7 @@ or check the circuit board (EBB) firmware version.
 	<_option value="disable-motors" >Disable Motors</_option> 
 	<_option value="wash-brush"     >Wash Brush (from home corner)</_option>
 	<_option value="version-check"  >Check EBB Version</_option>
+	<_option value="strip-data"     >Strip WCB data from file</_option>
       </param>
 
       <param name="WalkDistance" type="float" min="-11" max="11" 
