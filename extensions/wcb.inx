@@ -251,7 +251,7 @@ Layer 1: Top color.  Layer 8: Bottom color.
       <_param name="instructions_general" type="description"
 	      xml:space="preserve">
 WaterColorBot Control Inkscape extension 
-Release A37, dated 8/11/2013
+Release 0.9 (A45), dated 10/7/2013
 
 https://github.com/oskay/wcb-ink/
 
