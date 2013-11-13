@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <_name>Snap Colors to Layers</_name>
-  <id>command.evilmadscientist.wcb.snap_reva3</id>
+  <_name>Snap Colors to Layers (beta)</_name>
+  <id>command.evilmadscientist.wcb.snap_reva4</id>
 
 	<dependency type="executable" location="extensions">inkex.py</dependency>
 
@@ -13,7 +13,11 @@
 <_param name="aboutpage" type="description" xml:space="preserve">
 This extension "snaps" objects in the document
 into a standard color palette, and optionally
-moves them into numbered layers.</_param>
+moves them into numbered layers.
+
+This is beta software. Please save your
+document before using. :)
+</_param>
 
 	      <param name="snapLayers" type="boolean"
 	           _gui-text="Move objects to numbered layers*">true</param> 
@@ -53,7 +57,7 @@ colors are ignored.
 
 
 Additional WaterColorBot Documentation: 
-http://wiki.evilmadscientist.com/WaterColorBot
+http://watercolorbot.com/docs
 
 
 Pro-tip: Use the Live Preview option below!

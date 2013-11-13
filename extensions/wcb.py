@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 0.9 (Rev A45), dated 10/7/2013
+# Version 1.0, dated 11/12/2013
 #
 # Copyright 2013 Windell H. Oskay, Evil Mad Scientist Laboratories
 #
@@ -59,19 +59,9 @@ N_PEN_WASH_POS = 35      # Default pen-wash position
 N_SERVOSPEED = 50			# Default pen-lift speed 
 N_DEFAULT_LAYER = 1			# Default inkscape layer
 
-# F_DPI_16X = 896.0       #default DPI @ 16X microstepping
-# F_Speed_Scale = 40.0    #Default 100% speed, divided by 100. If value is 30, 100% speed will be 3000 steps/s.
-# 
-# F_StartPos_X = -270.0   #parking position, in pixels
-# F_StartPos_Y = 0.0      #parking position, in pixels
-# 
-# N_Water_X = 0.0    
-
 # if bDebug = True, create an HPGL file to show what is being plotted.
 # Pen up moves are shown in a different color if bDrawPenUpLines = True.
 # Try viewing the .hpgl file in a shareware program or create a simple viewer.
-
-
 
 
 bDebug = False
@@ -219,10 +209,7 @@ class WCB( inkex.Effect ):
 			action="store", type="float",
 			dest="reInkDist", default=10,
 			help="Re-ink distance (inches)" ) 
-# 		self.OptionParser.add_option( "--LeadInDist",
-# 			action="store", type="float",
-# 			dest="LeadInDist", default=0.25,
-# 			help="Re-ink distance (inches)" ) 
+			
 		self.OptionParser.add_option( "--smoothness",
 			action="store", type="float",
 			dest="smoothness", default=.2,
@@ -1693,8 +1680,11 @@ class WCB( inkex.Effect ):
 
 		intTemp = 7500 + 175 * self.options.penUpPosition
 		self.doCommand( 'SC,4,' + str( intTemp ) + '\r' )
+# 		inkex.errormsg( 'PenUpPosition: ' + str( self.options.penUpPosition ) + '%,  ' + str( intTemp ) + ' units' )
+		
 		intTemp = 7500 + 175 * self.options.penDownPosition
 		self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )
+# 		inkex.errormsg( 'penDownPosition: ' + str( self.options.penDownPosition ) + '%,  ' + str( intTemp ) + ' units' )
 
 		''' Servo speed units are in units of %/second, referring to the
 			percentages above.  The EBB takes speeds in units of 1/(12 MHz) steps
