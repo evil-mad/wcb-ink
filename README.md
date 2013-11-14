@@ -3,11 +3,10 @@ wcb-ink
 
 WaterColorBot Driver for Inkscape
 
-http://watercolorbot.com
+http://watercolorbot.com/
 
-Documentation (in progress): 
-http://wiki.evilmadscientist.com/WaterColorBot_Control
-
+Documentation home: 
+http://watercolorbot.com/docs
 
 ==========  INSTALLATION  ==========  
 
@@ -56,7 +55,7 @@ Suggested procedure to try out, for beta WaterColorBot units:
 
 
 11. Open Inkscape.
-12. Open WaterColorBot control extension in Inkscape.  Extensions menu > WaterColorBot > WaterColorBot Control
+12. Open WaterColorBot control extension in Inkscape.  Extensions menu > WaterColorBot > Control WaterColorBot
 
 13. Adjust brush-up and brush-down positions as needed from Setup tab.  Select "Toggle brush up/down" option, and click apply to move the carriage between the two positions.  Adjust numeric values as necessary.
 
