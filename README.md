@@ -20,7 +20,6 @@ http://wiki.evilmadscientist.com/Inkscape_and_WaterColorBot
 
 * Download installer from releases page: https://github.com/evil-mad/wcb-ink/releases/latest
 
-* 
 
 ==========  MANUAL INSTALLATION  ==========  
 
