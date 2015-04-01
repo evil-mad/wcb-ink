@@ -366,51 +366,55 @@ class WCB( inkex.Effect ):
 			self.PrintFromLayersTab = False
 			self.plotCurrentLayer = True
 			self.WCBOpenSerial()
-			self.svgNodeCount = 0
-			self.svgLastPath = 0
-			unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
-			self.svgLayer = 12345;  # indicate (to resume routine) that we are plotting all layers.
-			self.setPaintingMode()
-			self.plotToWCB()
-			
-			if ( self.LayersFoundToPlot == False ):
-				inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
-			
+			if self.serialPort is not None:
+				self.svgNodeCount = 0
+				self.svgLastPath = 0
+				unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
+				self.svgLayer = 12345;  # indicate (to resume routine) that we are plotting all layers.
+				self.setPaintingMode()
+				self.plotToWCB()
+				
+				if ( self.LayersFoundToPlot == False ):
+					inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
+				
 			
 
 		elif self.options.tab == '"resume"':
-			useOldResumeData = False
 			self.WCBOpenSerial()
-			self.setPaintingMode()
-			unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
-			self.resumePlotSetup()
-			if self.resumeMode:
-				self.fX = self.svgPausedPosX_Old + wcb_conf.F_StartPos_X
-				self.fY = self.svgPausedPosY_Old + wcb_conf.F_StartPos_Y
- 				self.resumeMode = False
- 				
- 				self.preResumeMove = True
-				self.plotLineAndTime(self.fX, self.fY) #Special pre-resume move
-				self.preResumeMove = False
-				self.resumeMode = True
-				self.nodeCount = 0
-				self.plotToWCB() 
-				
-			elif ( self.options.resumeType == "justGoHome" ):
-				self.fX = wcb_conf.F_StartPos_X
-				self.fY = wcb_conf.F_StartPos_Y 
-				self.plotLineAndTime(self.fX, self.fY)
-
-				#New values to write to file:
-				self.svgNodeCount = self.svgNodeCount_Old
-				self.svgLastPath = self.svgLastPath_Old 
-				self.svgLastPathNC = self.svgLastPathNC_Old 
-				self.svgPausedPosX = self.svgPausedPosX_Old 
-				self.svgPausedPosY = self.svgPausedPosY_Old
-				self.svgLayer = self.svgLayer_Old 
-
+			if self.serialPort is None:
+				useOldResumeData = True
 			else:
-				inkex.errormsg( gettext.gettext( "There does not seem to be any in-progress plot to resume." ) )
+				useOldResumeData = False
+				self.setPaintingMode()
+				unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
+				self.resumePlotSetup()
+				if self.resumeMode:
+					self.fX = self.svgPausedPosX_Old + wcb_conf.F_StartPos_X
+					self.fY = self.svgPausedPosY_Old + wcb_conf.F_StartPos_Y
+	 				self.resumeMode = False
+	 				
+	 				self.preResumeMove = True
+					self.plotLineAndTime(self.fX, self.fY) #Special pre-resume move
+					self.preResumeMove = False
+					self.resumeMode = True
+					self.nodeCount = 0
+					self.plotToWCB() 
+					
+				elif ( self.options.resumeType == "justGoHome" ):
+					self.fX = wcb_conf.F_StartPos_X
+					self.fY = wcb_conf.F_StartPos_Y 
+					self.plotLineAndTime(self.fX, self.fY)
+	
+					#New values to write to file:
+					self.svgNodeCount = self.svgNodeCount_Old
+					self.svgLastPath = self.svgLastPath_Old 
+					self.svgLastPathNC = self.svgLastPathNC_Old 
+					self.svgPausedPosX = self.svgPausedPosX_Old 
+					self.svgPausedPosY = self.svgPausedPosY_Old
+					self.svgLayer = self.svgLayer_Old 
+	
+				else:
+					inkex.errormsg( gettext.gettext( "There does not seem to be any in-progress plot to resume." ) )
 
 		elif self.options.tab == '"layers"':
 			useOldResumeData = False 
@@ -419,13 +423,14 @@ class WCB( inkex.Effect ):
 			self.LayersFoundToPlot = False
 			self.svgLastPath = 0
 			self.WCBOpenSerial()
-			self.setPaintingMode()
-			unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
-			self.svgNodeCount = 0;
-			self.svgLayer = self.options.layernumber
-			self.plotToWCB()
-			if ( self.LayersFoundToPlot == False ):
-				inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
+			if self.serialPort is not None:
+				self.setPaintingMode()
+				unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
+				self.svgNodeCount = 0;
+				self.svgLayer = self.options.layernumber
+				self.plotToWCB()
+				if ( self.LayersFoundToPlot == False ):
+					inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
 
 		elif self.options.tab == '"setup"':
 			self.WCBOpenSerial()
