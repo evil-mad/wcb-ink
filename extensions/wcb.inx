@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
   <_name>Control WaterColorBot</_name>
-  <id>command.evilmadscientist.wcb.plot_rev_50</id>
+  <id>command.evilmadscientist.wcb.plot_rev_51</id>
   <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
   <dependency type="executable" location="extensions">wcb.py</dependency>
   <dependency type="executable" location="extensions">inkex.py</dependency>
@@ -189,6 +189,10 @@ or check the circuit board (EBB) firmware version.
              
       <_param name="instructions_manual2" type="description"
 	      xml:space="preserve">
+	Note: Manual "walk" commands move the motors
+	as requested, _regardless_ of the current
+	position, even if it means running into walls.
+		
 	      Press 'Apply' to execute the command.
 </_param>
     </page>
@@ -247,7 +251,7 @@ Layer 1: Top color.  Layer 8: Bottom color.
       <_param name="instructions_general" type="description"
 	      xml:space="preserve">
 Control WaterColorBot Inkscape extension 
-Release 1.0, dated 11/12/2013
+Release 1.1, dated 3/31/2015
 
 http://watercolorbot.com/docs
 

@@ -275,6 +275,7 @@ class WCB( inkex.Effect ):
 			
 		self.bPenIsUp = True
 		self.virtualPenIsUp = False  #Keeps track of pen postion when stepping through plot before resuming
+		self.ignoreLimits = False
 		
 		self.fX = None
 		self.fY = None 
@@ -373,7 +374,7 @@ class WCB( inkex.Effect ):
 			self.plotToWCB()
 			
 			if ( self.LayersFoundToPlot == False ):
-				inkex.errormsg( gettext.gettext( 'Truly sorry; I did not find any numbered layers to paint.  You may want to use the "Snap Colors to Layers" extension, or read up on the documentation.' ) )
+				inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
 			
 			
 
@@ -392,19 +393,13 @@ class WCB( inkex.Effect ):
 				self.plotLineAndTime(self.fX, self.fY) #Special pre-resume move
 				self.preResumeMove = False
 				self.resumeMode = True
-# 				self.svgLastKnownPosX = self.fX
-# 				self.svgLastKnownPosY = self.fY
 				self.nodeCount = 0
-# 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
-# 				inkex.errormsg('self.fCurrX: ' + str(self.fCurrX)) 
 				self.plotToWCB() 
 				
 			elif ( self.options.resumeType == "justGoHome" ):
 				self.fX = wcb_conf.F_StartPos_X
 				self.fY = wcb_conf.F_StartPos_Y 
-				self.plotLineAndTime(self.fX, self.fY)  
-# 				self.svgLastKnownPosX = self.fX
-# 				self.svgLastKnownPosY = self.fY 
+				self.plotLineAndTime(self.fX, self.fY)
 
 				#New values to write to file:
 				self.svgNodeCount = self.svgNodeCount_Old
@@ -412,14 +407,10 @@ class WCB( inkex.Effect ):
 				self.svgLastPathNC = self.svgLastPathNC_Old 
 				self.svgPausedPosX = self.svgPausedPosX_Old 
 				self.svgPausedPosY = self.svgPausedPosY_Old
-				self.svgLayer = self.svgLayer_Old 				
-#  	 			self.svgLastKnownPosX = self.svgLastKnownPosX_Old
-#  				self.svgLastKnownPosY = self.svgLastKnownPosY_Old 
- 
-
+				self.svgLayer = self.svgLayer_Old 
 
 			else:
-				inkex.errormsg( gettext.gettext( "Truly sorry, there does not seem to be any in-progress plot to resume." ) )
+				inkex.errormsg( gettext.gettext( "There does not seem to be any in-progress plot to resume." ) )
 
 		elif self.options.tab == '"layers"':
 			useOldResumeData = False 
@@ -434,17 +425,24 @@ class WCB( inkex.Effect ):
 			self.svgLayer = self.options.layernumber
 			self.plotToWCB()
 			if ( self.LayersFoundToPlot == False ):
-				inkex.errormsg( gettext.gettext( 'Truly sorry; I did not find any numbered layers to paint.  You may want to use the "Snap Colors to Layers" extension, or read up on the documentation.' ) )
+				inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
 
 		elif self.options.tab == '"setup"':
 			self.WCBOpenSerial()
 			self.setupCommand()
 			
 		elif self.options.tab == '"manual"':
+			useOldResumeData = False 
+			self.svgNodeCount = self.svgNodeCount_Old
+			self.svgLastPath = self.svgLastPath_Old 
+			self.svgLastPathNC = self.svgLastPathNC_Old 
+			self.svgPausedPosX = self.svgPausedPosX_Old 
+			self.svgPausedPosY = self.svgPausedPosY_Old
+			self.svgLayer = self.svgLayer_Old 
 			self.WCBOpenSerial()
 			self.manualCommand()
 
-		if (useOldResumeData):	
+		if (useOldResumeData):	#Do not make any changes to data saved from SVG file.
 			self.svgNodeCount = self.svgNodeCount_Old
 			self.svgLastPath = self.svgLastPath_Old 
 			self.svgLastPathNC = self.svgLastPathNC_Old 
@@ -531,8 +529,6 @@ class WCB( inkex.Effect ):
 						pass
 
 	def UpdateSVGWCBData( self, aNodeList ):
-# 		inkex.errormsg('self.svgLastKnownPosX: ' + str(self.svgLastKnownPosX)) 
-#  		inkex.errormsg('self.svgLastKnownPosY: ' + str(self.svgLastKnownPosY)) 
 		if ( not self.svgDataRead ):
 			for node in aNodeList:
 				if node.tag == 'svg':
@@ -635,10 +631,11 @@ class WCB( inkex.Effect ):
 				self.fSpeed = self.options.penUpSpeed
 				
  			self.sendEnableMotors() #Set plotting resolution 
- 			self.fCurrX = 0
- 			self.fCurrY = 0
-			self.fX = nDeltaX * 90  #Note: Walking motors is STRICTLY RELATIVE TO INITIAL POSITION.
-			self.fY = nDeltaY * 90  
+			self.fCurrX = self.svgLastKnownPosX_Old + wcb_conf.F_StartPos_X
+			self.fCurrY = self.svgLastKnownPosY_Old + wcb_conf.F_StartPos_Y
+			self.ignoreLimits = True
+			self.fX = self.fCurrX + nDeltaX * 90  #Note: Walking motors is STRICTLY RELATIVE TO INITIAL POSITION.
+			self.fY = self.fCurrY + nDeltaY * 90  
 			self.plotLineAndTime(self.fX, self.fY ) 
 
 
@@ -1467,16 +1464,17 @@ class WCB( inkex.Effect ):
 		Here, we convert from floating-point pixel scale to actual motor steps, w/ present DPI.
 		'''
 		
-		maxSegmentDuration = 250.0  # Maximum time to spend painting a given segment
-		
-		if (xDest > self.xBoundsMax):	#Check machine size limit; truncate at edges
-			xDest = self.xBoundsMax
-		if (xDest < self.xBoundsMin):	#Check machine size limit; truncate at edges
-			xDest = self.xBoundsMin			
-		if (yDest > self.yBoundsMax):	#Check machine size limit; truncate at edges
-			yDest = self.yBoundsMax
-		if (yDest < self.yBoundsMin):	#Check machine size limit; truncate at edges
-			yDest = self.yBoundsMin
+		maxSegmentDuration = 500.0  # Maximum time to spend painting a given segment
+
+		if (self.ignoreLimits == False):
+			if (xDest > self.xBoundsMax):	#Check machine size limit; truncate at edges
+				xDest = self.xBoundsMax
+			if (xDest < self.xBoundsMin):	#Check machine size limit; truncate at edges
+				xDest = self.xBoundsMin			
+			if (yDest > self.yBoundsMax):	#Check machine size limit; truncate at edges
+				yDest = self.yBoundsMax
+			if (yDest < self.yBoundsMin):	#Check machine size limit; truncate at edges
+				yDest = self.yBoundsMin
 			
 		if self.bStopped:
 			return
@@ -1530,7 +1528,6 @@ class WCB( inkex.Effect ):
 					if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
 						if (self.paintdist > self.reInkDist):
 							self.reInkBrush() 
-
 			
 				xd = 0
 				yd = 0
@@ -1556,21 +1553,6 @@ class WCB( inkex.Effect ):
 						yd2 = -yd
 					else:
 						yd2 = yd 
-						
-# 					#Backlash correction: At motor level only; no record kept of its effect on position.	
-# 					if ((xd2 < 0) and not self.XBacklashFlag):
-# 						self.XBacklashFlag = True
-# 						xd2 -= self.backlashStepsX
-# 					if ((xd2 > 0) and self.XBacklashFlag):
-# 						self.XBacklashFlag = False
-# 						xd2 += self.backlashStepsX		
-# 							
-# 					if ((yd2 < 0) and not self.YBacklashFlag):
-# 						self.YBacklashFlag = True
-# 						yd2 -= self.backlashStepsY
-# 					if ((yd2 > 0) and self.YBacklashFlag):
-# 						self.YBacklashFlag = False
-# 						yd2 += self.backlashStepsY		
 						
 					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!
 
