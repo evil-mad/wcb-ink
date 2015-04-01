@@ -1414,51 +1414,51 @@ class WCB( inkex.Effect ):
 		if len( simplepath.parsePath( d ) ) == 0:
 			return
 
-		if (self.BrushColor != self.LayerPaintColor) or (self.BrushColor < 0):
-			self.PaintToolChange(self.LayerPaintColor)
-			
-		# reset page bounds for plotting:
-		self.xBoundsMax = wcb_conf.N_PAGE_WIDTH
-		self.xBoundsMin = 0
-		self.yBoundsMax = wcb_conf.N_PAGE_HEIGHT
-		self.yBoundsMin = 0
-
-		p = cubicsuperpath.parsePath( d )
-
-		# ...and apply the transformation to each point
-		applyTransformToPath( matTransform, p )
-
-		# p is now a list of lists of cubic beziers [control pt1, control pt2, endpoint]
-		# where the start-point is the last point in the previous segment.
-		for sp in p:
-
-			subdivideCubicPath( sp, self.options.smoothness )
-			nIndex = 0
-
-			for csp in sp:
-
-				if self.bStopped:
-					return
-
-				if self.plotCurrentLayer:
-					if nIndex == 0:
-						self.penUp()
-						self.virtualPenIsUp = True
-					elif nIndex == 1:
-						self.penDown()
-						self.virtualPenIsUp = False
-
-				nIndex += 1
-
-				self.fX = float( csp[1][0] )    # Set move destination
-				self.fY = float( csp[1][1] )  
+		if self.plotCurrentLayer:
+			if (self.BrushColor != self.LayerPaintColor) or (self.BrushColor < 0):
+				self.PaintToolChange(self.LayerPaintColor)
 				
-				if self.plotCurrentLayer:
-					self.plotLineAndTime(self.fX, self.fY )   #Draw a segment
+			# reset page bounds for plotting:
+			self.xBoundsMax = wcb_conf.N_PAGE_WIDTH
+			self.xBoundsMin = 0
+			self.yBoundsMax = wcb_conf.N_PAGE_HEIGHT
+			self.yBoundsMin = 0
+	
+			p = cubicsuperpath.parsePath( d )
+	
+			# ...and apply the transformation to each point
+			applyTransformToPath( matTransform, p )
+	
+			# p is now a list of lists of cubic beziers [control pt1, control pt2, endpoint]
+			# where the start-point is the last point in the previous segment.
+			for sp in p:
+	
+				subdivideCubicPath( sp, self.options.smoothness )
+				nIndex = 0
+	
+				for csp in sp:
+	
+					if self.bStopped:
+						return
+	
+					if self.plotCurrentLayer:
+						if nIndex == 0:
+							self.penUp()
+							self.virtualPenIsUp = True
+						elif nIndex == 1:
+							self.penDown()
+							self.virtualPenIsUp = False
+	
+					nIndex += 1
+	
+					self.fX = float( csp[1][0] )    # Set move destination
+					self.fY = float( csp[1][1] )  
 					
-		if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
-			self.svgLastPath = self.pathcount #The number of the last path completed
-			self.svgLastPathNC = self.nodeCount #the node count after the last path was completed.			
+					self.plotLineAndTime(self.fX, self.fY )   #Draw a segment
+						
+			if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
+				self.svgLastPath = self.pathcount #The number of the last path completed
+				self.svgLastPathNC = self.nodeCount #the node count after the last path was completed.			
 			
 
 	def plotLineAndTime( self, xDest, yDest ):
