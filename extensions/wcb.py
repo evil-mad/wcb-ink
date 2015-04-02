@@ -285,7 +285,6 @@ class WCB( inkex.Effect ):
 		self.bStopped = False
 		self.fSpeed = 1
 		self.resumeMode = False
-		self.stripData = False
 		self.nodeCount = int( 0 )		#NOTE: python uses 32-bit ints.
 		self.nodeTarget = int( 0 )
 		self.pathcount = int( 0 )
@@ -437,15 +436,23 @@ class WCB( inkex.Effect ):
 			self.setupCommand()
 			
 		elif self.options.tab == '"manual"':
-			useOldResumeData = False 
-			self.svgNodeCount = self.svgNodeCount_Old
-			self.svgLastPath = self.svgLastPath_Old 
-			self.svgLastPathNC = self.svgLastPathNC_Old 
-			self.svgPausedPosX = self.svgPausedPosX_Old 
-			self.svgPausedPosY = self.svgPausedPosY_Old
-			self.svgLayer = self.svgLayer_Old 
-			self.WCBOpenSerial()
-			self.manualCommand()
+			if self.options.manualType == "strip-data":
+				for node in self.svg.xpath( '//svg:WCB', namespaces=inkex.NSS ):
+					self.svg.remove( node )
+				for node in self.svg.xpath( '//svg:eggbot', namespaces=inkex.NSS ):
+					self.svg.remove( node )
+				inkex.errormsg( gettext.gettext( "I've removed all WaterColorBot data from this SVG file. Have a great day!" ) )
+				return	
+			else:	
+				useOldResumeData = False 
+				self.svgNodeCount = self.svgNodeCount_Old
+				self.svgLastPath = self.svgLastPath_Old 
+				self.svgLastPathNC = self.svgLastPathNC_Old 
+				self.svgPausedPosX = self.svgPausedPosX_Old 
+				self.svgPausedPosY = self.svgPausedPosY_Old
+				self.svgLayer = self.svgLayer_Old 
+				self.WCBOpenSerial()
+				self.manualCommand()
 
 		if (useOldResumeData):	#Do not make any changes to data saved from SVG file.
 			self.svgNodeCount = self.svgNodeCount_Old
@@ -461,16 +468,6 @@ class WCB( inkex.Effect ):
 		self.UpdateSVGWCBData( self.svg )
 		self.WCBCloseSerial()
 		
-		if (self.stripData):
-			for node in self.svg.xpath( '//svg:WCB', namespaces=inkex.NSS ):
-				self.svg.remove( node )
-			for node in self.svg.xpath( '//svg:eggbot', namespaces=inkex.NSS ):
-				self.svg.remove( node )
-			inkex.errormsg( gettext.gettext( "I've removed all WaterColorBot data from this Inkscape file. Have a great day!" ) )	
-		return
-		
-		
-	
 	def resumePlotSetup( self ):
 		self.LayerFound = False
 		if ( self.svgLayer_Old < 101 ) and ( self.svgLayer_Old >= 0 ):
@@ -612,9 +609,6 @@ class WCB( inkex.Effect ):
 		elif self.options.manualType == "version-check":
 			strVersion = self.doRequest( 'v\r' )
 			inkex.errormsg( 'I asked the EBB for its version info, and it replied:\n ' + strVersion )
-
-		elif self.options.manualType == "strip-data":
-			self.stripData = True
 			
 		else:  # self.options.manualType is walk motor:
 			if self.options.manualType == "walk-y-motor":
