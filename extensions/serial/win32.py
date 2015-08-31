@@ -10,19 +10,50 @@ from ctypes.wintypes import BYTE
 
 INVALID_HANDLE_VALUE = HANDLE(-1).value
 
+# some details of the windows API differ between 32 and 64 bit systems..
+def is_64bit():
+    """Returns true when running on a 64 bit system"""
+    return sizeof(c_ulong) != sizeof(c_void_p)
+
+# ULONG_PTR is a an ordinary number, not a pointer and contrary to the name it
+# is either 32 or 64 bits, depending on the type of windows...
+# so test if this a 32 bit windows...
+if is_64bit():
+    # assume 64 bits
+    ULONG_PTR = c_int64
+else:
+    # 32 bits
+    ULONG_PTR = c_ulong
+
+
 class _SECURITY_ATTRIBUTES(Structure):
     pass
 LPSECURITY_ATTRIBUTES = POINTER(_SECURITY_ATTRIBUTES)
 
-CreateEventW = _stdcall_libraries['kernel32'].CreateEventW
-CreateEventW.restype = HANDLE
-CreateEventW.argtypes = [LPSECURITY_ATTRIBUTES, BOOL, BOOL, LPCWSTR]
-CreateEvent = CreateEventW # alias
 
-CreateFileW = _stdcall_libraries['kernel32'].CreateFileW
-CreateFileW.restype = HANDLE
-CreateFileW.argtypes = [LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE]
-CreateFile = CreateFileW # alias
+try:
+    CreateEventW = _stdcall_libraries['kernel32'].CreateEventW
+except AttributeError:
+    # Fallback to non wide char version for old OS...
+    from ctypes.wintypes import LPCSTR
+    CreateEventA = _stdcall_libraries['kernel32'].CreateEventA
+    CreateEventA.restype = HANDLE
+    CreateEventA.argtypes = [LPSECURITY_ATTRIBUTES, BOOL, BOOL, LPCSTR]
+    CreateEvent=CreateEventA
+
+    CreateFileA = _stdcall_libraries['kernel32'].CreateFileA
+    CreateFileA.restype = HANDLE
+    CreateFileA.argtypes = [LPCSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE]
+    CreateFile = CreateFileA
+else:
+    CreateEventW.restype = HANDLE
+    CreateEventW.argtypes = [LPSECURITY_ATTRIBUTES, BOOL, BOOL, LPCWSTR]
+    CreateEvent = CreateEventW # alias
+
+    CreateFileW = _stdcall_libraries['kernel32'].CreateFileW
+    CreateFileW.restype = HANDLE
+    CreateFileW.argtypes = [LPCWSTR, DWORD, DWORD, LPSECURITY_ATTRIBUTES, DWORD, DWORD, HANDLE]
+    CreateFile = CreateFileW # alias
 
 class _OVERLAPPED(Structure):
     pass
@@ -142,6 +173,7 @@ SPACEPARITY = 4
 RTS_CONTROL_HANDSHAKE = 2 # Variable c_int
 RTS_CONTROL_DISABLE = 0 # Variable c_int
 RTS_CONTROL_ENABLE = 1 # Variable c_int
+RTS_CONTROL_TOGGLE = 3 # Variable c_int
 SETRTS = 3
 CLRRTS = 4
 
@@ -181,8 +213,8 @@ EV_EVENT2 = 4096 # Variable c_int
 EV_CTS = 8 # Variable c_int
 EV_BREAK = 64 # Variable c_int
 PURGE_RXCLEAR = 8 # Variable c_int
-ULONG_PTR = c_ulong
 INFINITE = 0xFFFFFFFFL
+
 
 class N11_OVERLAPPED4DOLLAR_48E(Union):
     pass

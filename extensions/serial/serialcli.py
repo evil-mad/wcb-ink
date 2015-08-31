@@ -9,7 +9,7 @@
 import clr
 import System
 import System.IO.Ports
-from serialutil import *
+from serial.serialutil import *
 
 
 def device(portnum):
@@ -24,7 +24,7 @@ def as_byte_array(string):
     return sab([ord(x) for x in string])  # XXX will require adaption when run with a 3.x compatible IronPython
 
 class IronSerial(SerialBase):
-    """Serial port implemenation for .NET/Mono."""
+    """Serial port implementation for .NET/Mono."""
 
     BAUDRATES = (50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800,
                 9600, 19200, 38400, 57600, 115200)
@@ -34,6 +34,8 @@ class IronSerial(SerialBase):
            if the port cannot be opened."""
         if self._port is None:
             raise SerialException("Port must be configured before it can be used.")
+        if self._isOpen:
+            raise SerialException("Port is already open.")
         try:
             self._port_handle = System.IO.Ports.SerialPort(self.portstr)
         except Exception, msg:

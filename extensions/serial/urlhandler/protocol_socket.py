@@ -10,14 +10,14 @@
 # The purpose of this module is that applications using pySerial can connect to
 # TCP/IP to serial port converters that do not support RFC 2217.
 #
-# (C) 2001-2009 Chris Liechti <cliechti@gmx.net>
+# (C) 2001-2011 Chris Liechti <cliechti@gmx.net>
 # this is distributed under a free software license, see license.txt
 #
 # URL format:    socket://<host>:<port>[/option[/option...]]
 # options:
 # - "debug" print diagnostic messages
 
-from serialutil import *
+from serial.serialutil import *
 import time
 import socket
 import logging
@@ -30,6 +30,7 @@ LOGGER_LEVELS = {
     'error': logging.ERROR,
     }
 
+POLL_TIMEOUT = 2
 
 class SocketSerial(SerialBase):
     """Serial port implementation for plain sockets."""
@@ -43,14 +44,17 @@ class SocketSerial(SerialBase):
         self.logger = None
         if self._port is None:
             raise SerialException("Port must be configured before it can be used.")
+        if self._isOpen:
+            raise SerialException("Port is already open.")
         try:
+            # XXX in future replace with create_connection (py >=2.6)
             self._socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
             self._socket.connect(self.fromURL(self.portstr))
         except Exception, msg:
             self._socket = None
             raise SerialException("Could not open port %s: %s" % (self.portstr, msg))
 
-        self._socket.settimeout(2) # used for write timeout support :/
+        self._socket.settimeout(POLL_TIMEOUT) # used for write timeout support :/
 
         # not that there anything to configure...
         self._reconfigurePort()
@@ -133,14 +137,24 @@ class SocketSerial(SerialBase):
         until the requested number of bytes is read."""
         if not self._isOpen: raise portNotOpenError
         data = bytearray()
-        timeout = time.time() + self._timeout
-        while len(data) < size and time.time() < timeout:
+        if self._timeout is not None:
+            timeout = time.time() + self._timeout
+        else:
+            timeout = None
+        while len(data) < size and (timeout is None or time.time() < timeout):
             try:
                 # an implementation with internal buffer would be better
                 # performing...
-                data = self._socket.recv(size - len(data))
+                t = time.time()
+                block = self._socket.recv(size - len(data))
+                duration = time.time() - t
+                if block:
+                    data.extend(block)
+                else:
+                    # no data -> EOF (connection probably closed)
+                    break
             except socket.timeout:
-                # just need to get out of recv form time to time to check if
+                # just need to get out of recv from time to time to check if
                 # still alive
                 continue
             except socket.error, e:
@@ -154,9 +168,10 @@ class SocketSerial(SerialBase):
         closed."""
         if not self._isOpen: raise portNotOpenError
         try:
-            self._socket.sendall(data)
+            self._socket.sendall(to_bytes(data))
         except socket.error, e:
-            raise SerialException("socket connection failed: %s" % e) # XXX what exception if socket connection fails
+            # XXX what exception if socket connection fails
+            raise SerialException("socket connection failed: %s" % e)
         return len(data)
 
     def flushInput(self):

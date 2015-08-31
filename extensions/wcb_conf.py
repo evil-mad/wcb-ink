@@ -1,6 +1,6 @@
 # wcb_conf.py
 # Part of the WaterColorBot driver for Inkscape
-# Version 0.9 (Rev A44), dated 10/5/2013
+# Version 1.2 , dated 2015-08-31
 #
 # https://github.com/oskay/watercolorbot/
 #

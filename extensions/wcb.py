@@ -2,9 +2,11 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.0, dated 11/12/2013
+# Version 1.2, dated 2015-08-31
+# 
+# Requires Pyserial 2.7.0
 #
-# Copyright 2013 Windell H. Oskay, Evil Mad Scientist Laboratories
+# Copyright 2015 Windell H. Oskay, Evil Mad Scientist Laboratories
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -1780,14 +1782,6 @@ class WCB( inkex.Effect ):
 		return None
 
 	def getSerialPort( self ):
-
-		# Before searching, first check to see if the last known
-		# serial port is still good.
-
-		serialPort = self.testSerialPort( self.svgSerialPort_Old )
-		if serialPort:
-			self.svgSerialPort = self.svgSerialPort_Old
-			return serialPort
 
 		# Try any devices which seem to have EBB boards attached
 		for strComPort in eggbot_scan.findEiBotBoards():
