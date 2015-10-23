@@ -1761,7 +1761,7 @@ class WCB( inkex.Effect ):
 		'''
 
 		try:
-			serialPort = serial.Serial( strComPort, timeout=1 ) # 1 second timeout!
+			serialPort = serial.Serial( strComPort, timeout=0.5 ) # 1 second timeout!
 
 			serialPort.setRTS()  # ??? remove
 			serialPort.setDTR()  # ??? remove
@@ -1773,6 +1773,13 @@ class WCB( inkex.Effect ):
 			serialPort.write( 'v\r' )
 			strVersion = serialPort.readline()
 
+			if strVersion and strVersion.startswith( 'EBB' ):
+				# do version control here to check the firmware...
+				return serialPort
+
+			serialPort.write( 'v\r' )
+			strVersion = serialPort.readline()		#Try a second query for El Capitan
+			
 			if strVersion and strVersion.startswith( 'EBB' ):
 				# do version control here to check the firmware...
 				return serialPort
