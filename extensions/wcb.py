@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.2, dated 2015-08-31
+# Version 1.2.1, dated 2015-11-12
 # 
 # Requires Pyserial 2.7.0
 #
@@ -1761,7 +1761,7 @@ class WCB( inkex.Effect ):
 		'''
 
 		try:
-			serialPort = serial.Serial( strComPort, timeout=0.5 ) # 1 second timeout!
+			serialPort = serial.Serial( strComPort, timeout=1.0 ) # 1 second timeout!
 
 			serialPort.setRTS()  # ??? remove
 			serialPort.setDTR()  # ??? remove

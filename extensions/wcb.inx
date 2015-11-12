@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
   <_name>Control WaterColorBot</_name>
-  <id>command.evilmadscientist.wcb.plot_rev_52</id>
+  <id>command.evilmadscientist.wcb.plot_rev_53</id>
   <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
   <dependency type="executable" location="extensions">wcb.py</dependency>
   <dependency type="executable" location="extensions">inkex.py</dependency>
@@ -251,12 +251,12 @@ Layer 1: Top color.  Layer 8: Bottom color.
       <_param name="instructions_general" type="description"
 	      xml:space="preserve">
 Control WaterColorBot Inkscape extension 
-Release 1.2, dated 2015-08-31
+Release 1.2.1, dated 2015-11-12
 
 http://watercolorbot.com/docs
 
 Issue Tracker
-https://github.com/evil-mad/wcb-ink/
+https://github.com/evil-mad/wcb-ink/issues
 
 *EBB Firmware 1.96 or newer required for certain
  functions. 
