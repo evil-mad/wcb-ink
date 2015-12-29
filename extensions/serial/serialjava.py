@@ -7,7 +7,7 @@
 # (C) 2002-2008 Chris Liechti <cliechti@gmx.net>
 # this is distributed under a free software license, see license.txt
 
-from serial.serialutil import *
+from serialutil import *
 
 def my_import(name):
     mod = __import__(name)
@@ -58,8 +58,6 @@ class JavaSerial(SerialBase):
            if the port cannot be opened."""
         if self._port is None:
             raise SerialException("Port must be configured before it can be used.")
-        if self._isOpen:
-            raise SerialException("Port is already open.")
         if type(self._port) == type(''):      # strings are taken directly
             portId = comm.CommPortIdentifier.getPortIdentifier(self._port)
         else:

@@ -1,4 +1,4 @@
-This directory contains a portion of pySerial 2.7, distributed under the Python License; please see LICENSE.txt.
+This directory contains a portion of pySerial 2.5, distributed under the Python License; please see LICENSE.txt.
 
 The changes made from the official pySerial distribution are as follows:
   - We are distributing only the "serial" directory of the original software.  
@@ -8,6 +8,7 @@ The changes made from the official pySerial distribution are as follows:
 
 
 Below follows the content of the original README.txt from the pySerial distribution:
+
 ==========
  pySerial
 ==========
@@ -24,7 +25,7 @@ automatically selects the appropriate backend.
 - SVN repository: http://sourceforge.net/svn/?group_id=46487
 - Download Page: http://sourceforge.net/project/showfiles.php?group_id=46487
 
-BSD license, (C) 2001-2013 Chris Liechti <cliechti@gmx.net>
+BSD license, (C) 2001-2010 Chris Liechti <cliechti@gmx.net>
 
 
 Documentation

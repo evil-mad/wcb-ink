@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.2.1, dated 2015-11-12
+# Version 1.2.2, dated 2015-12-29
 # 
 # Requires Pyserial 2.7.0
 #

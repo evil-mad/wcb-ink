@@ -46,35 +46,14 @@ except (NameError, AttributeError):
                 other = bytearray(other)
             return list.__eq__(self, other)
 
-# ``memoryview`` was introduced in Python 2.7 and ``bytes(some_memoryview)``
-# isn't returning the contents (very unfortunate). Therefore we need special
-# cases and test for it. Ensure that there is a ``memoryview`` object for older
-# Python versions. This is easier than making every test dependent on its
-# existence.
-try:
-    memoryview
-except (NameError, AttributeError):
-    # implementation does not matter as we do not realy use it.
-    # it just must not inherit from something else we might care for.
-    class memoryview:
-        pass
-
-
-# all Python versions prior 3.x convert ``str([17])`` to '[17]' instead of '\x11'
-# so a simple ``bytes(sequence)`` doesn't work for all versions
+# all Python versions prior 3.x convert str([17]) to '[17]' instead of '\x11'
+# so a simple bytes(sequence) doesn't work for all versions
 def to_bytes(seq):
     """convert a sequence to a bytes type"""
-    if isinstance(seq, bytes):
-        return seq
-    elif isinstance(seq, bytearray):
-        return bytes(seq)
-    elif isinstance(seq, memoryview):
-        return seq.tobytes()
-    else:
-        b = bytearray()
-        for item in seq:
-            b.append(item)  # this one handles int and str for our emulation and ints for Python 3.x
-        return bytes(b)
+    b = bytearray()
+    for item in seq:
+        b.append(item)  # this one handles int and str
+    return bytes(b)
 
 # create control bytes
 XON  = to_bytes([17])
@@ -105,8 +84,8 @@ class SerialTimeoutException(SerialException):
     """Write timeouts give an exception"""
 
 
-writeTimeoutError = SerialTimeoutException('Write timeout')
-portNotOpenError = SerialException('Attempting to use a port that is not open')
+writeTimeoutError = SerialTimeoutException("Write timeout")
+portNotOpenError = ValueError('Attempting to use a port that is not open')
 
 
 class FileLike(object):
@@ -181,13 +160,12 @@ class FileLike(object):
         sizehint is ignored."""
         if self.timeout is None:
             raise ValueError("Serial port MUST have enabled timeout for this function!")
-        leneol = len(eol)
         lines = []
         while True:
             line = self.readline(eol=eol)
             if line:
                 lines.append(line)
-                if line[-leneol:] != eol:    # was the line received with a timeout?
+                if line[-1] != eol:    # was the line received with a timeout?
                     break
             else:
                 break
@@ -335,13 +313,10 @@ class SerialBase(object):
         baud rate is not possible. If the port is closed, then the value is
         accepted and the exception is raised when the port is opened."""
         try:
-            b = int(baudrate)
+            self._baudrate = int(baudrate)
         except TypeError:
             raise ValueError("Not a valid baudrate: %r" % (baudrate,))
         else:
-            if b <= 0:
-                raise ValueError("Not a valid baudrate: %r" % (baudrate,))
-            self._baudrate = b
             if self._isOpen:  self._reconfigurePort()
 
     def getBaudrate(self):

@@ -8,14 +8,14 @@
 # The purpose of this module is.. well... You can run the unit tests with it.
 # and it was so easy to implement ;-)
 #
-# (C) 2001-2011 Chris Liechti <cliechti@gmx.net>
+# (C) 2001-2009 Chris Liechti <cliechti@gmx.net>
 # this is distributed under a free software license, see license.txt
 #
 # URL format:    loop://[option[/option...]]
 # options:
 # - "debug" print diagnostic messages
 
-from serial.serialutil import *
+from serialutil import *
 import threading
 import time
 import logging
@@ -30,7 +30,7 @@ LOGGER_LEVELS = {
 
 
 class LoopbackSerial(SerialBase):
-    """Serial port implementation that simulates a loop back connection in plain software."""
+    """Serial port implementation for plain sockets."""
 
     BAUDRATES = (50, 75, 110, 134, 150, 200, 300, 600, 1200, 1800, 2400, 4800,
                  9600, 19200, 38400, 57600, 115200)
@@ -38,8 +38,6 @@ class LoopbackSerial(SerialBase):
     def open(self):
         """Open port with current settings. This may throw a SerialException
            if the port cannot be opened."""
-        if self._isOpen:
-            raise SerialException("Port is already open.")
         self.logger = None
         self.buffer_lock = threading.Lock()
         self.loop_buffer = bytearray()
@@ -124,7 +122,7 @@ class LoopbackSerial(SerialBase):
         else:
             timeout = None
         data = bytearray()
-        while size > 0:
+        while len(data) < size:
             self.buffer_lock.acquire()
             try:
                 block = to_bytes(self.loop_buffer[:size])
@@ -132,7 +130,6 @@ class LoopbackSerial(SerialBase):
             finally:
                 self.buffer_lock.release()
             data += block
-            size -= len(block)
             # check for timeout now, after data has been read.
             # useful for timeout = 0 (non blocking) read
             if timeout and time.time() > timeout:
@@ -144,8 +141,6 @@ class LoopbackSerial(SerialBase):
         connection is blocked. May raise SerialException if the connection is
         closed."""
         if not self._isOpen: raise portNotOpenError
-        # ensure we're working with bytes
-        data = to_bytes(data)
         # calculate aprox time that would be used to send the data
         time_used_to_send = 10.0*len(data) / self._baudrate
         # when a write timeout is configured check if we would be successful
@@ -155,7 +150,7 @@ class LoopbackSerial(SerialBase):
             raise writeTimeoutError
         self.buffer_lock.acquire()
         try:
-            self.loop_buffer += data
+            self.loop_buffer += bytes(data)
         finally:
             self.buffer_lock.release()
         return len(data)
@@ -254,7 +249,7 @@ else:
 # simple client test
 if __name__ == '__main__':
     import sys
-    s = Serial('loop://')
+    s = Serial('socket://localhost:7000')
     sys.stdout.write('%s\n' % s)
 
     sys.stdout.write("write...\n")

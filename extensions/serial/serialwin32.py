@@ -3,15 +3,15 @@
 # serial driver for win32
 # see __init__.py
 #
-# (C) 2001-2011 Chris Liechti <cliechti@gmx.net>
+# (C) 2001-2009 Chris Liechti <cliechti@gmx.net>
 # this is distributed under a free software license, see license.txt
 #
 # Initial patch to use ctypes by Giovanni Bajo <rasky@develer.com>
 
 import ctypes
-from serial import win32
+import win32
 
-from serial.serialutil import *
+from serialutil import *
 
 
 def device(portnum):
@@ -27,14 +27,6 @@ class Win32Serial(SerialBase):
 
     def __init__(self, *args, **kwargs):
         self.hComPort = None
-        self._overlappedRead = None
-        self._overlappedWrite = None
-        self._rtsToggle = False
-
-        self._rtsState = win32.RTS_CONTROL_ENABLE
-        self._dtrState = win32.DTR_CONTROL_ENABLE
-
-
         SerialBase.__init__(self, *args, **kwargs)
 
     def open(self):
@@ -42,8 +34,6 @@ class Win32Serial(SerialBase):
            if the port cannot be opened."""
         if self._port is None:
             raise SerialException("Port must be configured before it can be used.")
-        if self._isOpen:
-            raise SerialException("Port is already open.")
         # the "\\.\COMx" format is required for devices other than COM1-COM8
         # not all versions of windows seem to support this properly
         # so that the first few ports are used with the DOS device name
@@ -63,41 +53,32 @@ class Win32Serial(SerialBase):
                0)
         if self.hComPort == win32.INVALID_HANDLE_VALUE:
             self.hComPort = None    # 'cause __del__ is called anyway
-            raise SerialException("could not open port %r: %r" % (self.portstr, ctypes.WinError()))
+            raise SerialException("could not open port %s: %s" % (self.portstr, ctypes.WinError()))
 
-        try:
-            self._overlappedRead = win32.OVERLAPPED()
-            self._overlappedRead.hEvent = win32.CreateEvent(None, 1, 0, None)
-            self._overlappedWrite = win32.OVERLAPPED()
-            #~ self._overlappedWrite.hEvent = win32.CreateEvent(None, 1, 0, None)
-            self._overlappedWrite.hEvent = win32.CreateEvent(None, 0, 0, None)
+        # Setup a 4k buffer
+        win32.SetupComm(self.hComPort, 4096, 4096)
 
-            # Setup a 4k buffer
-            win32.SetupComm(self.hComPort, 4096, 4096)
+        # Save original timeout values:
+        self._orgTimeouts = win32.COMMTIMEOUTS()
+        win32.GetCommTimeouts(self.hComPort, ctypes.byref(self._orgTimeouts))
 
-            # Save original timeout values:
-            self._orgTimeouts = win32.COMMTIMEOUTS()
-            win32.GetCommTimeouts(self.hComPort, ctypes.byref(self._orgTimeouts))
+        self._rtsState = win32.RTS_CONTROL_ENABLE
+        self._dtrState = win32.DTR_CONTROL_ENABLE
 
-            self._reconfigurePort()
+        self._reconfigurePort()
 
-            # Clear buffers:
-            # Remove anything that was there
-            win32.PurgeComm(self.hComPort,
-                    win32.PURGE_TXCLEAR | win32.PURGE_TXABORT |
-                    win32.PURGE_RXCLEAR | win32.PURGE_RXABORT)
-        except:
-            try:
-                self._close()
-            except:
-                # ignore any exception when closing the port
-                # also to keep original exception that happened when setting up
-                pass
-            self.hComPort = None
-            raise
-        else:
-            self._isOpen = True
+        # Clear buffers:
+        # Remove anything that was there
+        win32.PurgeComm(self.hComPort,
+                            win32.PURGE_TXCLEAR | win32.PURGE_TXABORT |
+                            win32.PURGE_RXCLEAR | win32.PURGE_RXABORT)
 
+        self._overlappedRead = win32.OVERLAPPED()
+        self._overlappedRead.hEvent = win32.CreateEvent(None, 1, 0, None)
+        self._overlappedWrite = win32.OVERLAPPED()
+        #~ self._overlappedWrite.hEvent = win32.CreateEvent(None, 1, 0, None)
+        self._overlappedWrite.hEvent = win32.CreateEvent(None, 0, 0, None)
+        self._isOpen = True
 
     def _reconfigurePort(self):
         """Set communication parameters on opened port."""
@@ -176,19 +157,13 @@ class Win32Serial(SerialBase):
         # Char. w/ Parity-Err are replaced with 0xff (if fErrorChar is set to TRUE)
         if self._rtscts:
             comDCB.fRtsControl  = win32.RTS_CONTROL_HANDSHAKE
-        elif self._rtsToggle:
-            comDCB.fRtsControl  = win32.RTS_CONTROL_TOGGLE
         else:
             comDCB.fRtsControl  = self._rtsState
         if self._dsrdtr:
             comDCB.fDtrControl  = win32.DTR_CONTROL_HANDSHAKE
         else:
             comDCB.fDtrControl  = self._dtrState
-
-        if self._rtsToggle:
-            comDCB.fOutxCtsFlow     = 0
-        else:
-            comDCB.fOutxCtsFlow     = self._rtscts
+        comDCB.fOutxCtsFlow     = self._rtscts
         comDCB.fOutxDsrFlow     = self._dsrdtr
         comDCB.fOutX            = self._xonxoff
         comDCB.fInX             = self._xonxoff
@@ -199,31 +174,22 @@ class Win32Serial(SerialBase):
         comDCB.XoffChar         = XOFF
 
         if not win32.SetCommState(self.hComPort, ctypes.byref(comDCB)):
-            raise ValueError("Cannot configure port, some setting was wrong. Original message: %r" % ctypes.WinError())
+            raise ValueError("Cannot configure port, some setting was wrong. Original message: %s" % ctypes.WinError())
 
     #~ def __del__(self):
         #~ self.close()
 
-
-    def _close(self):
-        """internal close port helper"""
-        if self.hComPort:
-            # Restore original timeout values:
-            win32.SetCommTimeouts(self.hComPort, self._orgTimeouts)
-            # Close COM-Port:
-            win32.CloseHandle(self.hComPort)
-            if self._overlappedRead is not None:
-                win32.CloseHandle(self._overlappedRead.hEvent)
-                self._overlappedRead = None
-            if self._overlappedWrite is not None:
-                win32.CloseHandle(self._overlappedWrite.hEvent)
-                self._overlappedWrite = None
-            self.hComPort = None
-
     def close(self):
         """Close port"""
         if self._isOpen:
-            self._close()
+            if self.hComPort:
+                # Restore original timeout values:
+                win32.SetCommTimeouts(self.hComPort, self._orgTimeouts)
+                # Close COM-Port:
+                win32.CloseHandle(self.hComPort)
+                win32.CloseHandle(self._overlappedRead.hEvent)
+                win32.CloseHandle(self._overlappedWrite.hEvent)
+                self.hComPort = None
             self._isOpen = False
 
     def makeDeviceName(self, port):
@@ -257,7 +223,7 @@ class Win32Serial(SerialBase):
                     rc = win32.DWORD()
                     err = win32.ReadFile(self.hComPort, buf, n, ctypes.byref(rc), ctypes.byref(self._overlappedRead))
                     if not err and win32.GetLastError() != win32.ERROR_IO_PENDING:
-                        raise SerialException("ReadFile failed (%r)" % ctypes.WinError())
+                        raise SerialException("ReadFile failed (%s)" % ctypes.WinError())
                     err = win32.WaitForSingleObject(self._overlappedRead.hEvent, win32.INFINITE)
                     read = buf.raw[:rc.value]
                 else:
@@ -267,7 +233,7 @@ class Win32Serial(SerialBase):
                 rc = win32.DWORD()
                 err = win32.ReadFile(self.hComPort, buf, size, ctypes.byref(rc), ctypes.byref(self._overlappedRead))
                 if not err and win32.GetLastError() != win32.ERROR_IO_PENDING:
-                    raise SerialException("ReadFile failed (%r)" % ctypes.WinError())
+                    raise SerialException("ReadFile failed (%s)" % ctypes.WinError())
                 err = win32.GetOverlappedResult(self.hComPort, ctypes.byref(self._overlappedRead), ctypes.byref(rc), True)
                 read = buf.raw[:rc.value]
         else:
@@ -280,31 +246,22 @@ class Win32Serial(SerialBase):
         #~ if not isinstance(data, (bytes, bytearray)):
             #~ raise TypeError('expected %s or bytearray, got %s' % (bytes, type(data)))
         # convert data (needed in case of memoryview instance: Py 3.1 io lib), ctypes doesn't like memoryview
-        data = to_bytes(data)
+        data = bytes(data)
         if data:
             #~ win32event.ResetEvent(self._overlappedWrite.hEvent)
             n = win32.DWORD()
             err = win32.WriteFile(self.hComPort, data, len(data), ctypes.byref(n), self._overlappedWrite)
             if not err and win32.GetLastError() != win32.ERROR_IO_PENDING:
-                raise SerialException("WriteFile failed (%r)" % ctypes.WinError())
-            if self._writeTimeout != 0: # if blocking (None) or w/ write timeout (>0)
-                # Wait for the write to complete.
-                #~ win32.WaitForSingleObject(self._overlappedWrite.hEvent, win32.INFINITE)
-                err = win32.GetOverlappedResult(self.hComPort, self._overlappedWrite, ctypes.byref(n), True)
-                if n.value != len(data):
-                    raise writeTimeoutError
+                raise SerialException("WriteFile failed (%s)" % ctypes.WinError())
+            # Wait for the write to complete.
+            #~ win32.WaitForSingleObject(self._overlappedWrite.hEvent, win32.INFINITE)
+            err = win32.GetOverlappedResult(self.hComPort, self._overlappedWrite, ctypes.byref(n), True)
+            if n.value != len(data):
+                raise writeTimeoutError
             return n.value
         else:
             return 0
 
-    def flush(self):
-        """Flush of file like objects. In this case, wait until all data
-           is written."""
-        while self.outWaiting():
-            time.sleep(0.05)
-        # XXX could also use WaitCommEvent with mask EV_TXEMPTY, but it would
-        # require overlapped IO and its also only possible to set a single mask
-        # on the port---
 
     def flushInput(self):
         """Clear input buffer, discarding all that is in the buffer."""
@@ -335,31 +292,23 @@ class Win32Serial(SerialBase):
 
     def setRTS(self, level=1):
         """Set terminal status line: Request To Send"""
-        # remember level for reconfigure
+        if not self.hComPort: raise portNotOpenError
         if level:
             self._rtsState = win32.RTS_CONTROL_ENABLE
+            win32.EscapeCommFunction(self.hComPort, win32.SETRTS)
         else:
             self._rtsState = win32.RTS_CONTROL_DISABLE
-        # also apply now if port is open
-        if self.hComPort:
-            if level:
-                win32.EscapeCommFunction(self.hComPort, win32.SETRTS)
-            else:
-                win32.EscapeCommFunction(self.hComPort, win32.CLRRTS)
+            win32.EscapeCommFunction(self.hComPort, win32.CLRRTS)
 
     def setDTR(self, level=1):
         """Set terminal status line: Data Terminal Ready"""
-        # remember level for reconfigure
+        if not self.hComPort: raise portNotOpenError
         if level:
             self._dtrState = win32.DTR_CONTROL_ENABLE
+            win32.EscapeCommFunction(self.hComPort, win32.SETDTR)
         else:
             self._dtrState = win32.DTR_CONTROL_DISABLE
-        # also apply now if port is open
-        if self.hComPort:
-            if level:
-                win32.EscapeCommFunction(self.hComPort, win32.SETDTR)
-            else:
-                win32.EscapeCommFunction(self.hComPort, win32.CLRDTR)
+            win32.EscapeCommFunction(self.hComPort, win32.CLRDTR)
 
     def _GetCommModemStatus(self):
         stat = win32.DWORD()
@@ -388,20 +337,8 @@ class Win32Serial(SerialBase):
 
     # - - platform specific - - - -
 
-    def setBufferSize(self, rx_size=4096, tx_size=None):
-        """\
-        Recommend a buffer size to the driver (device driver can ignore this
-        vlaue). Must be called before the port is opended.
-        """
-        if tx_size is None: tx_size = rx_size
-        win32.SetupComm(self.hComPort, rx_size, tx_size)
-
     def setXON(self, level=True):
-        """\
-        Manually control flow - when software flow control is enabled.
-        This will send XON (true) and XOFF (false) to the other device.
-        WARNING: this function is not portable to different platforms!
-        """
+        """Platform specific - set flow state."""
         if not self.hComPort: raise portNotOpenError
         if level:
             win32.EscapeCommFunction(self.hComPort, win32.SETXON)
@@ -415,18 +352,6 @@ class Win32Serial(SerialBase):
         if not win32.ClearCommError(self.hComPort, ctypes.byref(flags), ctypes.byref(comstat)):
             raise SerialException('call to ClearCommError failed')
         return comstat.cbOutQue
-
-    # functions useful for RS-485 adapters
-    def setRtsToggle(self, rtsToggle):
-        """Change RTS toggle control setting."""
-        self._rtsToggle = rtsToggle
-        if self._isOpen: self._reconfigurePort()
-
-    def getRtsToggle(self):
-        """Get the current RTS toggle control setting."""
-        return self._rtsToggle
-
-    rtsToggle = property(getRtsToggle, setRtsToggle, doc="RTS toggle control setting")
 
 
 # assemble Serial class with the platform specific implementation and the base
