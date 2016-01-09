@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.3.0, dated 2016-01-08
+# Version 1.3.1, dated 2016-01-08
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
@@ -38,13 +38,12 @@ import simplepath
 import serial
 import string
 import time
-import wcb_conf       
 
-import ebb_serial		# https://github.com/evil-mad/plotink
 import plot_utils		# https://github.com/evil-mad/plotink
+import ebb_serial		# https://github.com/evil-mad/plotink
 import ebb_motion		# https://github.com/evil-mad/plotink
 
-import eggbot_conf		#Some settings can be changed here.
+import wcb_conf       	#Some settings can be changed here.
 
 F_DEFAULT_SPEED = 1
 N_PEN_DOWN_DELAY = 400    # delay (ms) for the pen to go down before the next move
@@ -343,7 +342,6 @@ class WCB( inkex.Effect ):
 				self.plotCurrentLayer = False
 				self.LayersFoundToPlot = False
 				self.svgLastPath = 0
-	# 			self.WCBOpenSerial()
 				if self.serialPort is not None:
 					self.setPaintingMode()
 					unused_button = ebb_motion.QueryPRGButton(self.serialPort)	#Query if button pressed
@@ -477,7 +475,6 @@ class WCB( inkex.Effect ):
 
 		if self.options.setupType == "align-mode":
 			self.penUp()
-# 			self.sendDisableMotors()
 			ebb_motion.sendDisableMotors(self.serialPort)	
 
 		elif self.options.setupType == "toggle-pen":
@@ -508,7 +505,6 @@ class WCB( inkex.Effect ):
 		elif self.options.manualType == "align-mode":
 			self.ServoSetupWrapper()
 			self.penUp()
-# 			self.sendDisableMotors()
 			ebb_motion.sendDisableMotors(self.serialPort)	
 
 		elif self.options.manualType == "lower-pen":
@@ -519,7 +515,6 @@ class WCB( inkex.Effect ):
 			self.sendEnableMotors()
 
 		elif self.options.manualType == "disable-motors":
-# 			self.sendDisableMotors()
 			ebb_motion.sendDisableMotors(self.serialPort)	
 			
 		elif self.options.manualType == "wash-brush":  #Assuming we start in HOME POSITION.
