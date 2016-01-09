@@ -347,7 +347,7 @@ def interstices( P1, P2, paths, hatches, minGap=0.00001 ):
 			i = i + 2
 
 		else:
-			i = i + 1
+			i = i + 2	#Skip the whole segment, not just an endpoint.
 		# Ignore cases where the prior segment was short, this segment was
 		# short, and the gap between them was short but we might just want
 		# to combine them into one long segment.  That's indeed a possible
