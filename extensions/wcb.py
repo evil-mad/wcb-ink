@@ -2,11 +2,11 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.2.2, dated 2015-12-29
+# Version 1.3.0, dated 2016-01-08
 # 
-# Requires Pyserial 2.7.0
+# Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
-# Copyright 2015 Windell H. Oskay, Evil Mad Scientist Laboratories
+# Copyright 2016 Windell H. Oskay, Evil Mad Scientist Laboratories
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -30,25 +30,21 @@
 #       (If length of segment we're currently drawing + distance painted thus far) < 120% of repaint distance,
 #           hold off on getting ink until after this segment.
 
-
 # TODO: Advise user when no layers were found to plot-- from Paint tab
 
-from bezmisc import *
-from math import sqrt
 from simpletransform import *
 import gettext
 import simplepath
-import cspsubdiv
-import os
 import serial
 import string
-import sys
 import time
-import eggbot_scan
 import wcb_conf       
 
+import ebb_serial		# https://github.com/evil-mad/plotink
+import plot_utils		# https://github.com/evil-mad/plotink
+import ebb_motion		# https://github.com/evil-mad/plotink
 
-
+import eggbot_conf		#Some settings can be changed here.
 
 F_DEFAULT_SPEED = 1
 N_PEN_DOWN_DELAY = 400    # delay (ms) for the pen to go down before the next move
@@ -60,92 +56,6 @@ N_PEN_WASH_POS = 35      # Default pen-wash position
 
 N_SERVOSPEED = 50			# Default pen-lift speed 
 N_DEFAULT_LAYER = 1			# Default inkscape layer
-
-# if bDebug = True, create an HPGL file to show what is being plotted.
-# Pen up moves are shown in a different color if bDrawPenUpLines = True.
-# Try viewing the .hpgl file in a shareware program or create a simple viewer.
-
-
-bDebug = False
-miscDebug = False
-bDrawPenUpLines = False
-bDryRun = False # write the commands to a text file instead of the serial port
-
-platform = sys.platform.lower()
-
-HOME = os.getenv( 'HOME' )
-if platform == 'win32':
-	HOME = os.path.realpath( "C:/" )  # Arguably, this should be %APPDATA% or %TEMP%
-
-DEBUG_OUTPUT_FILE = os.path.join( HOME, 'test.hpgl' )
-DRY_RUN_OUTPUT_FILE = os.path.join( HOME, 'dry_run.txt' )
-MISC_OUTPUT_FILE = os.path.join( HOME, 'misc.txt' )
-
-##    if platform == 'darwin':
-##	''' There's no good value for OS X '''
-##	STR_DEFAULT_COM_PORT = '/dev/cu.usbmodem1a21'
-##    elif platform == 'sunos':
-##	''' Untested: YMMV '''
-##	STR_DEFAULT_COM_PORT = '/dev/term/0'
-##    else:
-##	''' Works fine on Ubuntu; YMMV '''
-##	STR_DEFAULT_COM_PORT = '/dev/ttyACM0'
-
-def parseLengthWithUnits( str ):
-	'''
-	Parse an SVG value which may or may not have units attached
-	This version is greatly simplified in that it only allows: no units,
-	units of px, and units of %.  Everything else, it returns None for.
-	There is a more general routine to consider in scour.py if more
-	generality is ever needed.
-	'''
-	u = 'px'
-	s = str.strip()
-	if s[-2:] == 'px':
-		s = s[:-2]
-	elif s[-1:] == '%':
-		u = '%'
-		s = s[:-1]
-
-	try:
-		v = float( s )
-	except:
-		return None, None
-
-	return v, u
-
-def subdivideCubicPath( sp, flat, i=1 ):
-	"""
-	Break up a bezier curve into smaller curves, each of which
-	is approximately a straight line within a given tolerance
-	(the "smoothness" defined by [flat]).
-
-	This is a modified version of cspsubdiv.cspsubdiv(). I rewrote the recursive
-	call because it caused recursion-depth errors on complicated line segments.
-	"""
-
-	while True:
-		while True:
-			if i >= len( sp ):
-				return
-
-			p0 = sp[i - 1][1]
-			p1 = sp[i - 1][2]
-			p2 = sp[i][0]
-			p3 = sp[i][1]
-
-			b = ( p0, p1, p2, p3 )
-
-			if cspsubdiv.maxdist( b ) > flat:
-				break
-
-			i += 1
-
-		one, two = beziersplitatt( b, 0.5 )
-		sp[i - 1][2] = one[1]
-		sp[i][0] = two[2]
-		p = [one[2], one[3], two[1]]
-		sp[i:1] = [p]
 
 class WCB( inkex.Effect ):
 
@@ -295,7 +205,6 @@ class WCB( inkex.Effect ):
 		self.BrushColor = -1
 		
 		#Values read from file:
-		self.svgSerialPort_Old = ''
 		self.svgLayer_Old = int( 0 )
 		self.svgNodeCount_Old = int( 0 )
 		self.svgDataRead_Old = False
@@ -307,7 +216,6 @@ class WCB( inkex.Effect ):
 		self.svgPausedPosY_Old = float( 0.0 )	
 		
 		#New values to write to file:
-		self.svgSerialPort = ''
 		self.svgLayer = int( 0 )
 		self.svgNodeCount = int( 0 )
 		self.svgDataRead = False
@@ -360,101 +268,111 @@ class WCB( inkex.Effect ):
 		self.svg = self.document.getroot()
 		self.CheckSVGforWCBData()
 		useOldResumeData = True
-		
-		if self.options.tab == '"splash"': 
-			self.LayersFoundToPlot = False
-			useOldResumeData = False
-			self.PrintFromLayersTab = False
-			self.plotCurrentLayer = True
-			self.WCBOpenSerial()
-			if self.serialPort is not None:
-				self.svgNodeCount = 0
-				self.svgLastPath = 0
-				unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
-				self.svgLayer = 12345;  # indicate (to resume routine) that we are plotting all layers.
-				self.setPaintingMode()
-				self.plotToWCB()
-				
-				if ( self.LayersFoundToPlot == False ):
-					inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
-				
-			
 
-		elif self.options.tab == '"resume"':
-			self.WCBOpenSerial()
-			if self.serialPort is None:
-				useOldResumeData = True
-			else:
+		skipSerial = False
+		if (self.options.tab == '"Help"'):
+			skipSerial = True
+ 		if (self.options.tab == '"options"'):
+			skipSerial = True 		
+ 		if (self.options.tab == '"timing"'):
+			skipSerial = True
+		if (self.options.tab == '"wcbModes"'):
+			skipSerial = True
+ 		
+ 		if skipSerial == False:
+ 			self.serialPort = ebb_serial.openPort()
+ 			if self.serialPort is None:
+				inkex.errormsg( gettext.gettext( "Failed to connect to WaterColorBot. :(" ) )
+		
+			if self.options.tab == '"splash"': 
+				self.LayersFoundToPlot = False
 				useOldResumeData = False
-				self.setPaintingMode()
-				unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
-				self.resumePlotSetup()
-				if self.resumeMode:
-					self.fX = self.svgPausedPosX_Old + wcb_conf.F_StartPos_X
-					self.fY = self.svgPausedPosY_Old + wcb_conf.F_StartPos_Y
-	 				self.resumeMode = False
-	 				
-	 				self.preResumeMove = True
-					self.plotLineAndTime(self.fX, self.fY) #Special pre-resume move
-					self.preResumeMove = False
-					self.resumeMode = True
-					self.nodeCount = 0
-					self.plotToWCB() 
+				self.PrintFromLayersTab = False
+				self.plotCurrentLayer = True
+				if self.serialPort is not None:
+					self.svgNodeCount = 0
+					self.svgLastPath = 0
+					unused_button = ebb_motion.QueryPRGButton(self.serialPort)	#Query if button pressed
+					self.svgLayer = 12345;  # indicate (to resume routine) that we are plotting all layers.
+					self.setPaintingMode()
+					self.plotToWCB()
 					
-				elif ( self.options.resumeType == "justGoHome" ):
-					self.fX = wcb_conf.F_StartPos_X
-					self.fY = wcb_conf.F_StartPos_Y 
-					self.plotLineAndTime(self.fX, self.fY)
+					if ( self.LayersFoundToPlot == False ):
+						inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
+					
+				
+			elif self.options.tab == '"resume"':
+				if self.serialPort is None:
+					useOldResumeData = True
+				else:
+					useOldResumeData = False
+					self.setPaintingMode()
+					unused_button = ebb_motion.QueryPRGButton(self.serialPort)	#Query if button pressed
+					self.resumePlotSetup()
+					if self.resumeMode:
+						self.fX = self.svgPausedPosX_Old + wcb_conf.F_StartPos_X
+						self.fY = self.svgPausedPosY_Old + wcb_conf.F_StartPos_Y
+		 				self.resumeMode = False
+		 				
+		 				self.preResumeMove = True
+						self.plotLineAndTime(self.fX, self.fY) #Special pre-resume move
+						self.preResumeMove = False
+						self.resumeMode = True
+						self.nodeCount = 0
+						self.plotToWCB() 
+						
+					elif ( self.options.resumeType == "justGoHome" ):
+						self.fX = wcb_conf.F_StartPos_X
+						self.fY = wcb_conf.F_StartPos_Y 
+						self.plotLineAndTime(self.fX, self.fY)
+		
+						#New values to write to file:
+						self.svgNodeCount = self.svgNodeCount_Old
+						self.svgLastPath = self.svgLastPath_Old 
+						self.svgLastPathNC = self.svgLastPathNC_Old 
+						self.svgPausedPosX = self.svgPausedPosX_Old 
+						self.svgPausedPosY = self.svgPausedPosY_Old
+						self.svgLayer = self.svgLayer_Old 
+		
+					else:
+						inkex.errormsg( gettext.gettext( "There does not seem to be any in-progress plot to resume." ) )
 	
-					#New values to write to file:
+			elif self.options.tab == '"layers"':
+				useOldResumeData = False 
+				self.PrintFromLayersTab = True
+				self.plotCurrentLayer = False
+				self.LayersFoundToPlot = False
+				self.svgLastPath = 0
+	# 			self.WCBOpenSerial()
+				if self.serialPort is not None:
+					self.setPaintingMode()
+					unused_button = ebb_motion.QueryPRGButton(self.serialPort)	#Query if button pressed
+					self.svgNodeCount = 0;
+					self.svgLayer = self.options.layernumber
+					self.plotToWCB()
+					if ( self.LayersFoundToPlot == False ):
+						inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
+	
+			elif self.options.tab == '"setup"':
+				self.setupCommand()
+				
+			elif self.options.tab == '"manual"':
+				if self.options.manualType == "strip-data":
+					for node in self.svg.xpath( '//svg:WCB', namespaces=inkex.NSS ):
+						self.svg.remove( node )
+					for node in self.svg.xpath( '//svg:eggbot', namespaces=inkex.NSS ):
+						self.svg.remove( node )
+					inkex.errormsg( gettext.gettext( "I've removed all WaterColorBot data from this SVG file. Have a great day!" ) )
+					return	
+				else:	
+					useOldResumeData = False 
 					self.svgNodeCount = self.svgNodeCount_Old
 					self.svgLastPath = self.svgLastPath_Old 
 					self.svgLastPathNC = self.svgLastPathNC_Old 
 					self.svgPausedPosX = self.svgPausedPosX_Old 
 					self.svgPausedPosY = self.svgPausedPosY_Old
 					self.svgLayer = self.svgLayer_Old 
-	
-				else:
-					inkex.errormsg( gettext.gettext( "There does not seem to be any in-progress plot to resume." ) )
-
-		elif self.options.tab == '"layers"':
-			useOldResumeData = False 
-			self.PrintFromLayersTab = True
-			self.plotCurrentLayer = False
-			self.LayersFoundToPlot = False
-			self.svgLastPath = 0
-			self.WCBOpenSerial()
-			if self.serialPort is not None:
-				self.setPaintingMode()
-				unused_button = self.doRequest( 'QB\r' ) #Query if button pressed
-				self.svgNodeCount = 0;
-				self.svgLayer = self.options.layernumber
-				self.plotToWCB()
-				if ( self.LayersFoundToPlot == False ):
-					inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
-
-		elif self.options.tab == '"setup"':
-			self.WCBOpenSerial()
-			self.setupCommand()
-			
-		elif self.options.tab == '"manual"':
-			if self.options.manualType == "strip-data":
-				for node in self.svg.xpath( '//svg:WCB', namespaces=inkex.NSS ):
-					self.svg.remove( node )
-				for node in self.svg.xpath( '//svg:eggbot', namespaces=inkex.NSS ):
-					self.svg.remove( node )
-				inkex.errormsg( gettext.gettext( "I've removed all WaterColorBot data from this SVG file. Have a great day!" ) )
-				return	
-			else:	
-				useOldResumeData = False 
-				self.svgNodeCount = self.svgNodeCount_Old
-				self.svgLastPath = self.svgLastPath_Old 
-				self.svgLastPathNC = self.svgLastPathNC_Old 
-				self.svgPausedPosX = self.svgPausedPosX_Old 
-				self.svgPausedPosY = self.svgPausedPosY_Old
-				self.svgLayer = self.svgLayer_Old 
-				self.WCBOpenSerial()
-				self.manualCommand()
+					self.manualCommand()
 
 		if (useOldResumeData):	#Do not make any changes to data saved from SVG file.
 			self.svgNodeCount = self.svgNodeCount_Old
@@ -468,7 +386,8 @@ class WCB( inkex.Effect ):
 
 		self.svgDataRead = False
 		self.UpdateSVGWCBData( self.svg )
-		self.WCBCloseSerial()
+		if skipSerial == False:
+			ebb_serial.closePort(self.serialPort)
 		
 	def resumePlotSetup( self ):
 		self.LayerFound = False
@@ -519,7 +438,6 @@ class WCB( inkex.Effect ):
 					self.recursiveWCBDataScan( node )
 				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
 					try:
-						self.svgSerialPort_Old = node.get( 'serialport' )
 						self.svgLayer_Old = int( node.get( 'layer' ) )
 						self.svgNodeCount_Old = int( node.get( 'node' ) )
 						self.svgLastPath_Old = int( node.get( 'lastpath' ) )
@@ -538,7 +456,6 @@ class WCB( inkex.Effect ):
 				if node.tag == 'svg':
 					self.UpdateSVGWCBData( node )
 				elif node.tag == inkex.addNS( 'WCB', 'svg' ) or node.tag == 'WCB':
-					node.set( 'serialport', self.svgSerialPort )
 					node.set( 'layer', str( self.svgLayer ) )
 					node.set( 'node', str( self.svgNodeCount ) )
 					node.set( 'lastpath', str( self.svgLastPath ) )
@@ -560,17 +477,18 @@ class WCB( inkex.Effect ):
 
 		if self.options.setupType == "align-mode":
 			self.penUp()
-			self.sendDisableMotors()
+# 			self.sendDisableMotors()
+			ebb_motion.sendDisableMotors(self.serialPort)	
 
 		elif self.options.setupType == "toggle-pen":
 			self.CleaningNow = False
 			self.ServoSetMode()
-			self.doCommand( 'TP\r' )		#Toggle pen
+			ebb_serial.command( self.serialPort, 'TP\r' )		
 
 		elif self.options.setupType == "toggle-wash":  
 			self.CleaningNow = True 
 			self.ServoSetMode()
-			self.doCommand( 'TP\r' )		#Toggle pen
+			ebb_serial.command( self.serialPort, 'TP\r' )		
  			self.CleaningNow = False
 
 			
@@ -590,7 +508,8 @@ class WCB( inkex.Effect ):
 		elif self.options.manualType == "align-mode":
 			self.ServoSetupWrapper()
 			self.penUp()
-			self.sendDisableMotors()
+# 			self.sendDisableMotors()
+			ebb_motion.sendDisableMotors(self.serialPort)	
 
 		elif self.options.manualType == "lower-pen":
 			self.ServoSetupWrapper()
@@ -600,7 +519,8 @@ class WCB( inkex.Effect ):
 			self.sendEnableMotors()
 
 		elif self.options.manualType == "disable-motors":
-			self.sendDisableMotors()
+# 			self.sendDisableMotors()
+			ebb_motion.sendDisableMotors(self.serialPort)	
 			
 		elif self.options.manualType == "wash-brush":  #Assuming we start in HOME POSITION.
 			self.ServoSetupWrapper() 
@@ -609,8 +529,10 @@ class WCB( inkex.Effect ):
 			self.moveHome()	 
 
 		elif self.options.manualType == "version-check":
-			strVersion = self.doRequest( 'v\r' )
+			strVersion = ebb_serial.query( self.serialPort, 'v\r' )
 			inkex.errormsg( 'I asked the EBB for its version info, and it replied:\n ' + strVersion )
+
+
 			
 		else:  # self.options.manualType is walk motor:
 			if self.options.manualType == "walk-y-motor":
@@ -623,7 +545,7 @@ class WCB( inkex.Effect ):
 				return
 				
 			#Query pen position: 1 up, 0 down (followed by OK)
-			strVersion = self.doRequest( 'QP\r' )
+			strVersion = ebb_serial.query( self.serialPort, 'QP\r' )
 			if strVersion[0] == '0':
 				#inkex.errormsg('Pen is down' )
 				self.fSpeed = self.options.penDownSpeed
@@ -699,15 +621,6 @@ class WCB( inkex.Effect ):
 
 
 	def PaintToolChange(self, color):   # Move Brush to certain paint color and ink the brush
-# 		if (self.resumeMode):	#simulation only
-# 			self.BrushColor = color 
-# 			self.paintdist = 0.0
-# 		else:
-
-
-
-		
-		
 		if (self.options.autoChange):
 # 			inkex.errormsg( 'About to clean brush at node#: ' + str( self.nodeCount ) + '.' )  
 			self.CleanBrush()
@@ -869,13 +782,6 @@ class WCB( inkex.Effect ):
 
 		self.ServoSetup()
 		self.sendEnableMotors() #Set plotting resolution
-		
-		if bDebug:
-			self.debugOut = open( DEBUG_OUTPUT_FILE, 'w' )
-			if bDrawPenUpLines:
-				self.debugOut.write( 'IN;SP1;' )
-			else:
-				self.debugOut.write( 'IN;PD;' )
 
 		try:
 			# wrap everything in a try so we can for sure close the serial port 
@@ -903,10 +809,6 @@ class WCB( inkex.Effect ):
 					self.svgPausedPosY = 0
 					#We are clearing saved position data from the SVG file, IF
 					#  we have completed a normal plot from the splash, layer, or resume tabs.
-
-					  
-
-
 
 		finally:
 			# We may have had an exception and lost the serial port...
@@ -956,9 +858,6 @@ class WCB( inkex.Effect ):
 					if (self.plotCurrentLayer == True):
 						self.LayersFoundToPlot = True
 			
-			
-						
-
 			if node.tag == inkex.addNS( 'g', 'svg' ) or node.tag == 'g':
 
 				self.penUp()
@@ -1428,8 +1327,8 @@ class WCB( inkex.Effect ):
 			# p is now a list of lists of cubic beziers [control pt1, control pt2, endpoint]
 			# where the start-point is the last point in the previous segment.
 			for sp in p:
-	
-				subdivideCubicPath( sp, self.options.smoothness )
+			
+				plot_utils.subdivideCubicPath( sp, self.options.smoothness )
 				nIndex = 0
 	
 				for csp in sp:
@@ -1465,7 +1364,7 @@ class WCB( inkex.Effect ):
 		Here, we convert from floating-point pixel scale to actual motor steps, w/ present DPI.
 		'''
 		
-		maxSegmentDuration = 500.0  # Maximum time to spend painting a given segment
+		maxSegmentDuration = 250.0  # Maximum time to spend painting a given segment
 
 		if (self.ignoreLimits == False):
 			if (xDest > self.xBoundsMax):	#Check machine size limit; truncate at edges
@@ -1498,7 +1397,7 @@ class WCB( inkex.Effect ):
 		else:
 			self.fSpeed = self.BrushDownSpeed
 
-		if ( distance( nDeltaX, nDeltaY ) > 0 ):
+		if ( plot_utils.distance( nDeltaX, nDeltaY ) > 0 ):
 			self.nodeCount += 1
 # 			inkex.errormsg( 'Nodecount: ' + str( self.nodeCount ) + '.' )
 # 			if (self.preResumeMove == True ):
@@ -1519,7 +1418,7 @@ class WCB( inkex.Effect ):
 						self.penDown()
 						self.fSpeed = self.BrushDownSpeed
 
-			nTime =  10000.00 / self.fSpeed * distance( nDeltaX, nDeltaY )
+			nTime =  10000.00 / self.fSpeed * plot_utils.distance( nDeltaX, nDeltaY )
 			nTime = int( math.ceil(nTime / 10.0))
 
 			while ( ( abs( nDeltaX ) > 0 ) or ( abs( nDeltaY ) > 0 ) ):
@@ -1557,7 +1456,7 @@ class WCB( inkex.Effect ):
 						
 					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!
 
-					self.doCommand( strOutput )
+					ebb_serial.command( self.serialPort, strOutput )		
 					self.fCurrX += xd / self.stepsPerPx   # Update current position
 					self.fCurrY += yd / self.stepsPerPx		
 
@@ -1566,13 +1465,12 @@ class WCB( inkex.Effect ):
 					
 					if (self.ReInkingNow == False):
 						if ((self.bPenIsUp == False) and (self.options.reInkEnable)):
-							self.paintdist += distance( xd, yd )
+							self.paintdist += plot_utils.distance( xd, yd )
 											
 				nDeltaX -= xd
 				nDeltaY -= yd 
 				nTime -= td
-				
-			strButton = self.doRequest( 'QB\r' ) #Query if button pressed
+			strButton = ebb_motion.QueryPRGButton(self.serialPort)	#Query if button pressed	
 			if strButton[0] != '0':
 				self.svgNodeCount = self.nodeCount;
 				self.svgPausedPosX = self.fCurrX - wcb_conf.F_StartPos_X	#self.svgLastKnownPosX
@@ -1586,17 +1484,17 @@ class WCB( inkex.Effect ):
 
 	def sendEnableMotors( self ):
 		if ( self.options.resolution == 1 ):
-			self.doCommand( 'EM,1,1\r' ) # 16X microstepping
+			ebb_serial.command( self.serialPort, 'EM,1,1\r')	# 16X microstepping	
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 90.0 )
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale
 		elif ( self.options.resolution == 2 ):
-			self.doCommand( 'EM,2,2\r' ) # 8X microstepping
+			ebb_serial.command( self.serialPort, 'EM,2,2\r' ) # 8X microstepping
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 180.0 )  
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 2
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 2
 		else:
-			self.doCommand( 'EM,3,3\r' ) # 4X microstepping  
+			ebb_serial.command( self.serialPort,  'EM,3,3\r' ) # 4X microstepping  
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 360.0 )
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 4
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 4
@@ -1614,25 +1512,12 @@ class WCB( inkex.Effect ):
 # 		inkex.errormsg('self.backlashStepsX: ' + str(self.backlashStepsX)) 
 # 		inkex.errormsg('self.backlashStepsY: ' + str(self.backlashStepsY)) 
 
-	def sendDisableMotors( self ):
-		self.doCommand( 'EM,0,0\r' )
-
-	def doTimedPause( self, nPause ):
-		while ( nPause > 0 ):
-			if ( nPause > 750 ):
-				td = int( 750 )
-			else:
-				td = nPause
-				if ( td < 1 ):
-					td = int( 1 ) # don't allow zero-time moves
-			if ( not self.resumeMode ):
-				self.doCommand( 'SM,' + str( td ) + ',0,0\r' )
-			nPause -= td
 
 	def penUp( self ):
 		if ( ( not self.resumeMode ) or ( not self.virtualPenIsUp ) ):
-			self.doCommand( 'SP,1\r' )
-			self.doTimedPause( self.options.penUpDelay ) # pause for pen to go up
+			ebb_serial.command( self.serialPort, 'SP,1\r')		
+			if ( not self.resumeMode ):
+				ebb_motion.doTimedPause(self.serialPort, self.options.penUpDelay ) # pause for pen to go up
 			self.bPenIsUp = True
 		self.virtualPenIsUp = True
 
@@ -1640,20 +1525,21 @@ class WCB( inkex.Effect ):
 		self.virtualPenIsUp = False  # Virtual pen keeps track of state for resuming plotting.
 		if ( (not self.resumeMode) and ( not self.bStopped )):
 			self.ServoSetMode()
-			self.doCommand( 'SP,0\r' )
-			self.doTimedPause( self.options.penDownDelay ) # pause for pen to go down
+			ebb_serial.command( self.serialPort, 'SP,0\r' )	
+			if ( not self.resumeMode ):
+				ebb_motion.doTimedPause(self.serialPort, self.options.penDownDelay ) # pause for pen to go down
 			self.bPenIsUp = False
  			
 
 
 	def ServoSetupWrapper( self ):
 		self.ServoSetup()
-		strVersion = self.doRequest( 'QP\r' ) #Query pen position: 1 up, 0 down (followed by OK)
+		strVersion = ebb_serial.query( self.serialPort, 'QP\r' )
 		if strVersion[0] == '0':
 			#inkex.errormsg('Pen is down' )
-			self.doCommand( 'SP,0\r' ) #Lower Pen
+			ebb_serial.command( self.serialPort,  'SP,0\r' ) #Lower Pen	
 		else:
-			self.doCommand( 'SP,1\r' ) #Raise pen
+			ebb_serial.command( self.serialPort, 'SP,1\r' ) #Raise pen
 
 	def ServoSetup( self ):
 		''' Pen position units range from 0% to 100%, which correspond to
@@ -1662,12 +1548,11 @@ class WCB( inkex.Effect ):
 		'''
 
 		intTemp = 7500 + 175 * self.options.penUpPosition
-		self.doCommand( 'SC,4,' + str( intTemp ) + '\r' )
-# 		inkex.errormsg( 'PenUpPosition: ' + str( self.options.penUpPosition ) + '%,  ' + str( intTemp ) + ' units' )
-		
+		ebb_serial.command( self.serialPort,  'SC,4,' + str( intTemp ) + '\r' )	
+				
 		intTemp = 7500 + 175 * self.options.penDownPosition
-		self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )
-# 		inkex.errormsg( 'penDownPosition: ' + str( self.options.penDownPosition ) + '%,  ' + str( intTemp ) + ' units' )
+		ebb_serial.command( self.serialPort,  'SC,5,' + str( intTemp ) + '\r' )
+
 
 		''' Servo speed units are in units of %/second, referring to the
 			percentages above.  The EBB takes speeds in units of 1/(12 MHz) steps
@@ -1676,47 +1561,23 @@ class WCB( inkex.Effect ):
 			to ~3.6 steps/21 ms.  Rounding this to 4 steps/21 ms is sufficient.		'''
 		
 		intTemp = 4 * self.options.ServoUpSpeed
-		self.doCommand( 'SC,11,' + str( intTemp ) + '\r' )
+		ebb_serial.command( self.serialPort, 'SC,11,' + str( intTemp ) + '\r' )
+
 		intTemp = 4 * self.options.ServoDownSpeed
-		self.doCommand( 'SC,12,' + str( intTemp ) + '\r' )
+		ebb_serial.command( self.serialPort,  'SC,12,' + str( intTemp ) + '\r' )
 		
 		
 	def ServoSetMode (self):
 		if (self.CleaningNow):
 			intTemp = 7500 + 175 * self.options.penWashPosition
-			self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )			
 		else:
 			intTemp = 7500 + 175 * self.options.penDownPosition
-			self.doCommand( 'SC,5,' + str( intTemp ) + '\r' )	
+		ebb_serial.command( self.serialPort,  'SC,5,' + str( intTemp ) + '\r' )		
 		
 		
-		
-
 	def stop( self ):
 		self.bStopped = True
-		
-	def getLength( self, name, default ):
-		'''
-		Get the <svg> attribute with name "name" and default value "default"
-		Parse the attribute into a value and associated units.  Then, accept
-		no units (''), units of pixels ('px'), and units of percentage ('%').
-		'''
-		str = self.svg.get( name )
-		if str:
-			v, u = parseLengthWithUnits( str )
-			if not v:
-				# Couldn't parse the value
-				return None
-			elif ( u == '' ) or ( u == 'px' ):
-				return v
-			elif u == '%':
-				return float( default ) * v / 100.0
-			else:
-				# Unsupported units
-				return None
-		else:
-			# No width specified; assume the default value
-			return float( default )
+	
 
 	def getDocProps( self ):
 		'''
@@ -1724,120 +1585,12 @@ class WCB( inkex.Effect ):
 		Use a default value in case the property is not present or is
 		expressed in units of percentages.
 		'''
-		self.svgHeight = self.getLength( 'height', N_PAGE_HEIGHT )
-		self.svgWidth = self.getLength( 'width', N_PAGE_WIDTH )
+		self.svgHeight = plot_utils.getLength( self, 'height', float( wcb_conf.N_PAGE_HEIGHT )  )
+		self.svgWidth = plot_utils.getLength( self, 'width', float( wcb_conf.N_PAGE_WIDTH )  )
 		if ( self.svgHeight == None ) or ( self.svgWidth == None ):
 			return False
 		else:
 			return True
-			
-			
-	def WCBOpenSerial( self ):
-		if not bDryRun:
-			self.serialPort = self.getSerialPort()
-		else:
-			self.serialPort = open( DRY_RUN_OUTPUT_FILE, 'w' )
-
-		if self.serialPort is None:
-			inkex.errormsg( gettext.gettext( "I couldn\'t find the WaterColorBot. :(" ) )
-
-	def WCBCloseSerial( self ):
-		try:
-			if self.serialPort:
-				self.serialPort.flush()
-				self.serialPort.close()
-			if bDebug:
-				self.debugOut.close()
-		finally:
-			self.serialPort = None
-			return
-
-	def testSerialPort( self, strComPort ):
-		'''
-		look at COM1 to COM20 and return a SerialPort object
-		for the first port with an EBB (WCB board).
-
-		YOU are responsible for closing this serial port!
-		'''
-
-		try:
-			serialPort = serial.Serial( strComPort, timeout=1.0 ) # 1 second timeout!
-
-			serialPort.setRTS()  # ??? remove
-			serialPort.setDTR()  # ??? remove
-			serialPort.flushInput()
-			serialPort.flushOutput()
-
-			time.sleep( 0.1 )
-
-			serialPort.write( 'v\r' )
-			strVersion = serialPort.readline()
-
-			if strVersion and strVersion.startswith( 'EBB' ):
-				# do version control here to check the firmware...
-				return serialPort
-
-			serialPort.write( 'v\r' )
-			strVersion = serialPort.readline()		#Try a second query for El Capitan
-			
-			if strVersion and strVersion.startswith( 'EBB' ):
-				# do version control here to check the firmware...
-				return serialPort
-			serialPort.close()
-		except serial.SerialException:
-			pass
-		return None
-
-	def getSerialPort( self ):
-
-		# Try any devices which seem to have EBB boards attached
-		for strComPort in eggbot_scan.findEiBotBoards():
-			serialPort = self.testSerialPort( strComPort )
-			if serialPort:
-				self.svgSerialPort = strComPort
-				return serialPort
-
-		# Try any likely ports
-		for strComPort in eggbot_scan.findPorts():
-			serialPort = self.testSerialPort( strComPort )
-			if serialPort:
-				self.svgSerialPort = strComPort
-				return serialPort
-
-		return None
-
-	def doCommand( self, cmd ):
-		try:
-			self.serialPort.write( cmd )
-			response = self.serialPort.readline()
-			if ( response != 'OK\r\n' ):
-				if ( response != '' ):
-					inkex.errormsg( 'After command ' + cmd + ',' )
-					inkex.errormsg( 'Received bad response from EBB: ' + str( response ) + '.' )
-					#inkex.errormsg('BTW:: Node number is ' + str(self.nodeCount) + '.')
-
-				else:
-					inkex.errormsg( 'EBB Serial Timeout.' )
-
-		except:
-			pass
-
-	def doRequest( self, cmd ):
-		response = ''
-		try:
-			self.serialPort.write( cmd )
-			response = self.serialPort.readline()
-			unused_response = self.serialPort.readline() #read in extra blank/OK line
-		except:
-			inkex.errormsg( gettext.gettext( "Error reading serial data." ) )
-
-		return response
-
-def distance( x, y ):
-	'''
-	Pythagorean theorem!
-	'''
-	return sqrt( x * x + y * y )
 
 e = WCB()
 #e.affect(output=False)
