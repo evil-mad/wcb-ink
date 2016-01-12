@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.3.1, dated 2016-01-08
+# Version 1.3.2, dated 2016-01-11
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
@@ -41,7 +41,7 @@ import time
 
 import plot_utils		# https://github.com/evil-mad/plotink
 import ebb_serial		# https://github.com/evil-mad/plotink
-import ebb_motion		# https://github.com/evil-mad/plotink
+import ebb_motion		# https://github.com/evil-mad/plotink  Requires version 0.2
 
 import wcb_conf       	#Some settings can be changed here.
 
@@ -480,12 +480,16 @@ class WCB( inkex.Effect ):
 		elif self.options.setupType == "toggle-pen":
 			self.CleaningNow = False
 			self.ServoSetMode()
-			ebb_serial.command( self.serialPort, 'TP\r' )		
+			ebb_motion.TogglePen(self.serialPort)
+			ebb_motion.doTimedPause(self.serialPort, 100) 
+			#give previous command a chance to execute before the port is closed.	
 
 		elif self.options.setupType == "toggle-wash":  
 			self.CleaningNow = True 
 			self.ServoSetMode()
-			ebb_serial.command( self.serialPort, 'TP\r' )		
+			ebb_motion.TogglePen(self.serialPort)
+			ebb_motion.doTimedPause(self.serialPort, 100) 
+			#give previous command a chance to execute before the port is closed.
  			self.CleaningNow = False
 
 			
@@ -1449,7 +1453,7 @@ class WCB( inkex.Effect ):
 					else:
 						yd2 = yd 
 						
-					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!
+					strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!  WaterColorBot
 
 					ebb_serial.command( self.serialPort, strOutput )		
 					self.fCurrX += xd / self.stepsPerPx   # Update current position
@@ -1524,8 +1528,6 @@ class WCB( inkex.Effect ):
 			if ( not self.resumeMode ):
 				ebb_motion.doTimedPause(self.serialPort, self.options.penDownDelay ) # pause for pen to go down
 			self.bPenIsUp = False
- 			
-
 
 	def ServoSetupWrapper( self ):
 		self.ServoSetup()
@@ -1561,18 +1563,15 @@ class WCB( inkex.Effect ):
 		intTemp = 4 * self.options.ServoDownSpeed
 		ebb_serial.command( self.serialPort,  'SC,12,' + str( intTemp ) + '\r' )
 		
-		
 	def ServoSetMode (self):
 		if (self.CleaningNow):
 			intTemp = 7500 + 175 * self.options.penWashPosition
 		else:
 			intTemp = 7500 + 175 * self.options.penDownPosition
 		ebb_serial.command( self.serialPort,  'SC,5,' + str( intTemp ) + '\r' )		
-		
-		
+
 	def stop( self ):
 		self.bStopped = True
-	
 
 	def getDocProps( self ):
 		'''
