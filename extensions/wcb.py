@@ -184,10 +184,11 @@ class WCB( inkex.Effect ):
 			help="Selected layer for multilayer plotting" )			
 			
 			
+		self.serialPort = None
 		self.bPenIsUp = True
 		self.virtualPenIsUp = False  #Keeps track of pen postion when stepping through plot before resuming
 		self.ignoreLimits = False
-		
+
 		self.fX = None
 		self.fY = None 
 		self.fCurrX = wcb_conf.F_StartPos_X
@@ -384,8 +385,9 @@ class WCB( inkex.Effect ):
 
 		self.svgDataRead = False
 		self.UpdateSVGWCBData( self.svg )
-		if skipSerial == False:
-			ebb_serial.closePort(self.serialPort)
+		if self.serialPort is not None:
+			ebb_motion.doTimedPause(self.serialPort, 10) #Pause a moment for underway commands to finish...
+			ebb_serial.closePort(self.serialPort)	
 		
 	def resumePlotSetup( self ):
 		self.LayerFound = False
@@ -408,7 +410,7 @@ class WCB( inkex.Effect ):
 					return
 				self.ServoSetup()
 				self.penUp() 
-				self.sendEnableMotors() #Set plotting resolution  
+				self.EnableMotors() #Set plotting resolution  
 				self.fSpeed = self.options.penUpSpeed
 				self.fCurrX = self.svgLastKnownPosX_Old + wcb_conf.F_StartPos_X
 				self.fCurrY = self.svgLastKnownPosY_Old + wcb_conf.F_StartPos_Y
@@ -481,15 +483,11 @@ class WCB( inkex.Effect ):
 			self.CleaningNow = False
 			self.ServoSetMode()
 			ebb_motion.TogglePen(self.serialPort)
-			ebb_motion.doTimedPause(self.serialPort, 100) 
-			#give previous command a chance to execute before the port is closed.	
 
 		elif self.options.setupType == "toggle-wash":  
 			self.CleaningNow = True 
 			self.ServoSetMode()
 			ebb_motion.TogglePen(self.serialPort)
-			ebb_motion.doTimedPause(self.serialPort, 100) 
-			#give previous command a chance to execute before the port is closed.
  			self.CleaningNow = False
 
 			
@@ -516,14 +514,14 @@ class WCB( inkex.Effect ):
 			self.penDown()
 
 		elif self.options.manualType == "enable-motors":
-			self.sendEnableMotors()
+			self.EnableMotors()
 
 		elif self.options.manualType == "disable-motors":
 			ebb_motion.sendDisableMotors(self.serialPort)	
 			
 		elif self.options.manualType == "wash-brush":  #Assuming we start in HOME POSITION.
 			self.ServoSetupWrapper() 
-			self.sendEnableMotors() #Set plotting resolution 
+			self.EnableMotors() #Set plotting resolution 
 			self.CleanBrush()
 			self.moveHome()	 
 
@@ -552,7 +550,7 @@ class WCB( inkex.Effect ):
 				#inkex.errormsg('Pen is up' )
 				self.fSpeed = self.options.penUpSpeed
 				
- 			self.sendEnableMotors() #Set plotting resolution 
+ 			self.EnableMotors() #Set plotting resolution 
 			self.fCurrX = self.svgLastKnownPosX_Old + wcb_conf.F_StartPos_X
 			self.fCurrY = self.svgLastKnownPosY_Old + wcb_conf.F_StartPos_Y
 			self.ignoreLimits = True
@@ -780,7 +778,7 @@ class WCB( inkex.Effect ):
 				self.svgTransform = parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1])))
 
 		self.ServoSetup()
-		self.sendEnableMotors() #Set plotting resolution
+		self.EnableMotors() #Set plotting resolution
 
 		try:
 			# wrap everything in a try so we can for sure close the serial port 
@@ -1481,19 +1479,19 @@ class WCB( inkex.Effect ):
 				return
 					
 
-	def sendEnableMotors( self ):
+	def EnableMotors( self ):
 		if ( self.options.resolution == 1 ):
-			ebb_serial.command( self.serialPort, 'EM,1,1\r')	# 16X microstepping	
+			ebb_motion.sendEnableMotors(self.serialPort, 1) # 16X microstepping
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 90.0 )
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale
 		elif ( self.options.resolution == 2 ):
-			ebb_serial.command( self.serialPort, 'EM,2,2\r' ) # 8X microstepping
+			ebb_motion.sendEnableMotors(self.serialPort, 2) # 8X microstepping
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 180.0 )  
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 2
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 2
 		else:
-			ebb_serial.command( self.serialPort,  'EM,3,3\r' ) # 4X microstepping  
+			ebb_motion.sendEnableMotors(self.serialPort, 3) # 4X microstepping  
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 360.0 )
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 4
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 4
@@ -1511,23 +1509,20 @@ class WCB( inkex.Effect ):
 # 		inkex.errormsg('self.backlashStepsX: ' + str(self.backlashStepsX)) 
 # 		inkex.errormsg('self.backlashStepsY: ' + str(self.backlashStepsY)) 
 
-
 	def penUp( self ):
-		if ( ( not self.resumeMode ) or ( not self.virtualPenIsUp ) ):
-			ebb_serial.command( self.serialPort, 'SP,1\r')		
-			if ( not self.resumeMode ):
-				ebb_motion.doTimedPause(self.serialPort, self.options.penUpDelay ) # pause for pen to go up
+		self.virtualPenIsUp = True  # Virtual pen keeps track of state for resuming plotting.
+		if ( not self.resumeMode) and (not self.bPenIsUp):	# skip if pen is already up, or if we're resuming.
+			ebb_motion.sendPenUp(self.serialPort, self.options.penUpDelay )				
 			self.bPenIsUp = True
-		self.virtualPenIsUp = True
 
 	def penDown( self ):
 		self.virtualPenIsUp = False  # Virtual pen keeps track of state for resuming plotting.
-		if ( (not self.resumeMode) and ( not self.bStopped )):
-			self.ServoSetMode()
-			ebb_serial.command( self.serialPort, 'SP,0\r' )	
-			if ( not self.resumeMode ):
-				ebb_motion.doTimedPause(self.serialPort, self.options.penDownDelay ) # pause for pen to go down
-			self.bPenIsUp = False
+		if (self.bPenIsUp):  # skip if pen is already down
+			if ((not self.resumeMode) and ( not self.bStopped )): #skip if resuming or stopped
+				self.ServoSetMode()
+				ebb_serial.command( self.serialPort, 'SP,0\r' )	
+				ebb_motion.sendPenDown(self.serialPort, self.options.penUpDelay )						
+				self.bPenIsUp = False
 
 	def ServoSetupWrapper( self ):
 		self.ServoSetup()
