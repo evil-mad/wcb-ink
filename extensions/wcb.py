@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.3.2, dated 2016-01-11
+# Version 1.3.3, dated 2016-01-17
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
@@ -185,7 +185,7 @@ class WCB( inkex.Effect ):
 			
 			
 		self.serialPort = None
-		self.bPenIsUp = True
+		self.bPenIsUp = None  #Initial state of pen is neither up nor down, but _unknown_.
 		self.virtualPenIsUp = False  #Keeps track of pen postion when stepping through plot before resuming
 		self.ignoreLimits = False
 
@@ -225,8 +225,7 @@ class WCB( inkex.Effect ):
 		self.svgLastKnownPosY = float( 0.0 )
 		self.svgPausedPosX = float( 0.0 )
 		self.svgPausedPosY = float( 0.0 )	
-		
-				
+
 		self.backlashStepsX = int(0)
 		self.backlashStepsY = int(0)	 
 		self.XBacklashFlag = True
@@ -504,11 +503,6 @@ class WCB( inkex.Effect ):
 			self.ServoSetupWrapper()
 			self.penUp()
 
-		elif self.options.manualType == "align-mode":
-			self.ServoSetupWrapper()
-			self.penUp()
-			ebb_motion.sendDisableMotors(self.serialPort)	
-
 		elif self.options.manualType == "lower-pen":
 			self.ServoSetupWrapper()
 			self.penDown()
@@ -529,8 +523,6 @@ class WCB( inkex.Effect ):
 			strVersion = ebb_serial.query( self.serialPort, 'v\r' )
 			inkex.errormsg( 'I asked the EBB for its version info, and it replied:\n ' + strVersion )
 
-
-			
 		else:  # self.options.manualType is walk motor:
 			if self.options.manualType == "walk-y-motor":
 				nDeltaX = 0
@@ -544,10 +536,8 @@ class WCB( inkex.Effect ):
 			#Query pen position: 1 up, 0 down (followed by OK)
 			strVersion = ebb_serial.query( self.serialPort, 'QP\r' )
 			if strVersion[0] == '0':
-				#inkex.errormsg('Pen is down' )
 				self.fSpeed = self.options.penDownSpeed
 			if strVersion[0] == '1':
-				#inkex.errormsg('Pen is up' )
 				self.fSpeed = self.options.penUpSpeed
 				
  			self.EnableMotors() #Set plotting resolution 
@@ -579,8 +569,6 @@ class WCB( inkex.Effect ):
 		self.fX = xPos   #Todo: Add limit checking?
 		self.fY = yPos 
 		self.plotLineAndTime(self.fX, self.fY )  
-		
-
 
 	def MoveToWater(self, dish):
 		self.penUp()  
@@ -593,8 +581,7 @@ class WCB( inkex.Effect ):
 		self.xBoundsMin = wcb_conf.F_StartPos_X
 		self.yBoundsMin = wcb_conf.F_StartPos_Y
 		self.MoveToXY(wcb_conf.F_StartPos_X, wcb_conf.F_StartPos_Y)
-				 		
-				
+
 	def PaintSwirl (self, swirlCount, Xpp, Ypp): # Xpp, Ypp: Peak-to-peak deviation in X and Y
 		TempInkingState = self.ReInkingNow
 		self.ReInkingNow = True   #Part of the "Re-inking" process, so override any desire to go get paint.
@@ -609,13 +596,11 @@ class WCB( inkex.Effect ):
  		self.penUp()  
  		self.ReInkingNow = TempInkingState
 
-
 	def MoveToPaint(self, dish):
 		self.penUp() 
 		self.xBoundsMin = wcb_conf.F_StartPos_X
 		self.yBoundsMin = wcb_conf.F_StartPos_Y
 		self.MoveToXY(wcb_conf.F_StartPos_X + wcb_conf.PaintLoc[dish][0], wcb_conf.F_StartPos_Y + wcb_conf.PaintLoc[dish][1])
-
 
 	def PaintToolChange(self, color):   # Move Brush to certain paint color and ink the brush
 		if (self.options.autoChange):
@@ -641,8 +626,7 @@ class WCB( inkex.Effect ):
 # 				inkex.errormsg( 'self.options.ReWetOnly: ' + str( self.options.ReWetOnly) + '.' )  
 # 				inkex.errormsg( 'self.options.PreDipEnable: ' + str( self.options.PreDipEnable) + '.' )  	
 # 				inkex.errormsg( 'self.options.PostDipEnable: ' + str( self.options.PostDipEnable) + '.' )  
-						
-										
+
 				if ((self.options.reInkEnable) and (self.options.ReWetOnly == False)): # if we are using paint
 					if (self.options.PreDipEnable or self.options.PostDipEnable): #Using Paint AND water
 						self.CleanBrush()
@@ -664,7 +648,6 @@ class WCB( inkex.Effect ):
 					self.MoveToWater(0)		#water dip only
 					self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
 
-		
 	def reInkBrush(self):	
 		self.ReInkingNow = True
 		
@@ -696,18 +679,14 @@ class WCB( inkex.Effect ):
 				self.MoveToWater(0)
 				self.PaintSwirl(1, wcb_conf.WaterDipDelta[0], wcb_conf.WaterDipDelta[1])
 
-
-
-		
- 		self.xBoundsMin = returnToXmin
- 		self.yBoundsMin = returnToYmin
- 							
+		self.xBoundsMin = returnToXmin
+		self.yBoundsMin = returnToYmin
+							
 		self.MoveToXY(returnToX, returnToY)		#TODO: Add lead-in here
 		self.penDown() 
 		self.ReInkingNow = False
 		self.paintdist = 0
 
-		
 	def setPaintingMode(self):
 		#Note: For manual mode, we use the existing options set. Otherwise, override:	
 		if self.options.paintMode == "wc":
@@ -778,6 +757,7 @@ class WCB( inkex.Effect ):
 				self.svgTransform = parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1])))
 
 		self.ServoSetup()
+		self.penUp() 
 		self.EnableMotors() #Set plotting resolution
 
 		try:
@@ -792,8 +772,7 @@ class WCB( inkex.Effect ):
 				self.fX = self.ptFirst[0]
 				self.fY = self.ptFirst[1] 
  				self.nodeCount = self.nodeTarget    
-				self.plotLineAndTime(self.fX, self.fY ) 
-				# 				self.moveHome()	 
+				self.plotLineAndTime(self.fX, self.fY )
 			if ( not self.bStopped ): 
 				if (self.options.tab == '"splash"') or (self.options.tab == '"layers"') or (self.options.tab == '"resume"'):
 					self.svgLayer = 0
@@ -804,8 +783,8 @@ class WCB( inkex.Effect ):
 					self.svgLastKnownPosY = 0
 					self.svgPausedPosX = 0
 					self.svgPausedPosY = 0
-					#We are clearing saved position data from the SVG file, IF
-					#  we have completed a normal plot from the splash, layer, or resume tabs.
+					#Clear saved position data from the SVG file,
+					#  IF we have completed a normal plot from the splash, layer, or resume tabs.
 
 		finally:
 			# We may have had an exception and lost the serial port...
@@ -1292,9 +1271,6 @@ class WCB( inkex.Effect ):
 			self.LayersFoundToPlot = True
 			self.LayerPaintColor = layerNameInt
 
-
-
-
 	def plotPath( self, path, matTransform ):
 		'''
 		Plot the path while applying the transformation defined
@@ -1381,14 +1357,12 @@ class WCB( inkex.Effect ):
 		xTemp = self.stepsPerPx * ( xDest - self.fCurrX ) + self.xErr
 		yTemp = self.stepsPerPx * ( yDest - self.fCurrY ) + self.yErr
 
-					
 		nDeltaX = int (round(xTemp)) # Number of motor steps required
 		nDeltaY = int (round(yTemp)) 
-		 
+
 		self.xErr = xTemp - float(nDeltaX)  # Keep track of rounding errors, so that they do not accumulate.
 		self.yErr = yTemp - float(nDeltaY)
-				
-		 	
+
 		if self.bPenIsUp:
 			self.fSpeed = self.BrushUpSpeed
 		else:
@@ -1405,12 +1379,7 @@ class WCB( inkex.Effect ):
 				if ( self.nodeCount >= self.nodeTarget ):
 					self.resumeMode = False
 					self.paintdist = 0
-#  					inkex.errormsg('Resume turned off at node #: ' + str(self.nodeCount))
-#  					inkex.errormsg( 'self.ReInkingNow: ' + str( self.ReInkingNow) + '.' ) 
-#  					inkex.errormsg('reInkEnable : ' + str(self.options.reInkEnable))
-#
 
-					
 					if ( not self.virtualPenIsUp ):
 						self.penDown()
 						self.fSpeed = self.BrushDownSpeed
@@ -1497,8 +1466,6 @@ class WCB( inkex.Effect ):
 			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 4
 		self.reInkDist = self.options.reInkDist * 90 * self.stepsPerPx # in motor steps
 
-		
-		
 		# Motor steps for backlash compensation:
 		# self.options.backlashX is in mils, need to calculate how many steps that is.
 		# self.options.backlashX * (1 inch/1000 mils) * (90 px/1 inch) * self.stepsPerPx
@@ -1517,34 +1484,32 @@ class WCB( inkex.Effect ):
 
 	def penDown( self ):
 		self.virtualPenIsUp = False  # Virtual pen keeps track of state for resuming plotting.
-		if (self.bPenIsUp):  # skip if pen is already down
+		if (self.bPenIsUp != False):  # skip if pen is already down
 			if ((not self.resumeMode) and ( not self.bStopped )): #skip if resuming or stopped
 				self.ServoSetMode()
-				ebb_serial.command( self.serialPort, 'SP,0\r' )	
 				ebb_motion.sendPenDown(self.serialPort, self.options.penUpDelay )						
 				self.bPenIsUp = False
 
 	def ServoSetupWrapper( self ):
+		# Assert what the defined "up" and "down" positions of the servo motor should be,
+		#    and determine what the pen state is.
 		self.ServoSetup()
 		strVersion = ebb_serial.query( self.serialPort, 'QP\r' )
 		if strVersion[0] == '0':
-			#inkex.errormsg('Pen is down' )
-			ebb_serial.command( self.serialPort,  'SP,0\r' ) #Lower Pen	
+			self.bPenIsUp = False
 		else:
-			ebb_serial.command( self.serialPort, 'SP,1\r' ) #Raise pen
+			self.bPenIsUp = True
 
 	def ServoSetup( self ):
 		''' Pen position units range from 0% to 100%, which correspond to
 		    a timing range of 7500 - 25000 in units of 1/(12 MHz).
 		    1% corresponds to ~14.6 us, or 175 units of 1/(12 MHz).
 		'''
-
 		intTemp = 7500 + 175 * self.options.penUpPosition
 		ebb_serial.command( self.serialPort,  'SC,4,' + str( intTemp ) + '\r' )	
 				
 		intTemp = 7500 + 175 * self.options.penDownPosition
 		ebb_serial.command( self.serialPort,  'SC,5,' + str( intTemp ) + '\r' )
-
 
 		''' Servo speed units are in units of %/second, referring to the
 			percentages above.  The EBB takes speeds in units of 1/(12 MHz) steps
