@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.3.3, dated 2016-01-17
+# Version 1.4.0, dated 2016-02-20
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
@@ -38,6 +38,8 @@ import simplepath
 import serial
 import string
 import time
+from math import sqrt
+from array import *
 
 import plot_utils		# https://github.com/evil-mad/plotink
 import ebb_serial		# https://github.com/evil-mad/plotink
@@ -251,16 +253,14 @@ class WCB( inkex.Effect ):
 		self.svgTransform = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
 		
 		self.stepsPerPx = float( wcb_conf.F_DPI_16X / 90.0 )  
-		self.BrushUpSpeed   = float(10 * wcb_conf.F_Speed_Scale) #speed when brush is up
-		self.BrushDownSpeed = float(10 * wcb_conf.F_Speed_Scale) #speed when brush is down		
+		self.BrushUpSpeed   = float(wcb_conf.F_Speed_Scale) #speed when brush is up
+		self.BrushDownSpeed = float(wcb_conf.F_Speed_Scale) #speed when brush is down		
 					
 		# So that we only generate a warning once for each
 		# unsupported SVG element, we use a dictionary to track
 		# which elements have received a warning
 		self.warnings = {}
-			
-		self.preResumeMove = False
- 
+
 	def effect( self ):
 		'''Main entry point: check to see which tab is selected, and act accordingly.'''
 
@@ -313,9 +313,9 @@ class WCB( inkex.Effect ):
 						self.fY = self.svgPausedPosY_Old + wcb_conf.F_StartPos_Y
 		 				self.resumeMode = False
 		 				
-		 				self.preResumeMove = True
-						self.plotLineAndTime(self.fX, self.fY) #Special pre-resume move
-						self.preResumeMove = False
+						
+						self.penUpRapidMove( self.fX, self.fY ) #Special pre-resume move
+						
 						self.resumeMode = True
 						self.nodeCount = 0
 						self.plotToWCB() 
@@ -323,7 +323,7 @@ class WCB( inkex.Effect ):
 					elif ( self.options.resumeType == "justGoHome" ):
 						self.fX = wcb_conf.F_StartPos_X
 						self.fY = wcb_conf.F_StartPos_Y 
-						self.plotLineAndTime(self.fX, self.fY)
+						self.penUpRapidMove( self.fX, self.fY ) #Rapid pen-up movements
 		
 						#New values to write to file:
 						self.svgNodeCount = self.svgNodeCount_Old
@@ -574,13 +574,17 @@ class WCB( inkex.Effect ):
 		self.penUp()  
 		self.xBoundsMin = wcb_conf.F_StartPos_X
 		self.yBoundsMin = wcb_conf.F_StartPos_Y
-		self.MoveToXY(wcb_conf.F_StartPos_X + wcb_conf.WaterLoc[dish][0], wcb_conf.F_StartPos_Y + wcb_conf.WaterLoc[dish][1])
 		# Values give X and Y positions of water dish 'dish.' 
-		 
+		self.fX  = wcb_conf.F_StartPos_X + wcb_conf.WaterLoc[dish][0]
+		self.fY  = wcb_conf.F_StartPos_Y + wcb_conf.WaterLoc[dish][1]
+		self.penUpRapidMove(self.fX, self.fY )  
+
 	def moveHome(self):
+		self.penUp() 
 		self.xBoundsMin = wcb_conf.F_StartPos_X
 		self.yBoundsMin = wcb_conf.F_StartPos_Y
-		self.MoveToXY(wcb_conf.F_StartPos_X, wcb_conf.F_StartPos_Y)
+		self.penUpRapidMove(wcb_conf.F_StartPos_X, wcb_conf.F_StartPos_Y )  
+
 
 	def PaintSwirl (self, swirlCount, Xpp, Ypp): # Xpp, Ypp: Peak-to-peak deviation in X and Y
 		TempInkingState = self.ReInkingNow
@@ -596,11 +600,14 @@ class WCB( inkex.Effect ):
  		self.penUp()  
  		self.ReInkingNow = TempInkingState
 
+
 	def MoveToPaint(self, dish):
 		self.penUp() 
 		self.xBoundsMin = wcb_conf.F_StartPos_X
 		self.yBoundsMin = wcb_conf.F_StartPos_Y
-		self.MoveToXY(wcb_conf.F_StartPos_X + wcb_conf.PaintLoc[dish][0], wcb_conf.F_StartPos_Y + wcb_conf.PaintLoc[dish][1])
+		self.fX = wcb_conf.F_StartPos_X + wcb_conf.PaintLoc[dish][0]
+		self.fY = wcb_conf.F_StartPos_Y + wcb_conf.PaintLoc[dish][1]
+		self.penUpRapidMove(self.fX, self.fY)
 
 	def PaintToolChange(self, color):   # Move Brush to certain paint color and ink the brush
 		if (self.options.autoChange):
@@ -682,7 +689,8 @@ class WCB( inkex.Effect ):
 		self.xBoundsMin = returnToXmin
 		self.yBoundsMin = returnToYmin
 							
-		self.MoveToXY(returnToX, returnToY)		#TODO: Add lead-in here
+# 		self.MoveToXY(returnToX, returnToY)		#TODO: Add lead-in here
+		self.penUpRapidMove( returnToX, returnToY )
 		self.penDown() 
 		self.ReInkingNow = False
 		self.paintdist = 0
@@ -737,15 +745,19 @@ class WCB( inkex.Effect ):
 		if self.serialPort is None:
 			return
 
-# 		if self.options.startCentered and ( not self.getDocProps() ):
+# 		TODO: Re-enable checking of SVG document width and height
+# 		if (not self.getDocProps()):
 # 			# Cannot handle the document's dimensions!!!
 # 			inkex.errormsg( gettext.gettext(
-# 			'The document to be plotted has invalid dimensions. ' +
-# 			'The dimensions must be unitless or have units of pixels (px) or ' +
-# 			'percentages (%). Document dimensions may be set in Inkscape with ' +
-# 			'File > Document Properties' ) )
-# 			return
-
+# 			'This document does not have valid dimensions.\r\r' +
+# 			'Consider starting with the WaterColorBot template, or ' +
+# 			'setting the document size to 3200 px (wide) x 800 px (tall).\r\r' +
+# 			'Document dimensions may be set in Inkscape with ' +
+# 			'File > Document Properties.\r\rThe document dimensions must be unitless or have ' +
+# 			'units of pixels (px) or percentages (%).   '	) )
+# 			return			
+# 			
+# 			
 		# Viewbox handling
 		# Also ignores the preserveAspectRatio attribute
 		viewbox = self.svg.get( 'viewBox' )
@@ -772,7 +784,8 @@ class WCB( inkex.Effect ):
 				self.fX = self.ptFirst[0]
 				self.fY = self.ptFirst[1] 
  				self.nodeCount = self.nodeTarget    
-				self.plotLineAndTime(self.fX, self.fY )
+# 				self.plotLineAndTime(self.fX, self.fY )
+				self.penUpRapidMove( self.fX, self.fY ) #Rapid pen-up movements
 			if ( not self.bStopped ): 
 				if (self.options.tab == '"splash"') or (self.options.tab == '"layers"') or (self.options.tab == '"resume"'):
 					self.svgLayer = 0
@@ -1175,19 +1188,18 @@ class WCB( inkex.Effect ):
 			elif node.tag == inkex.addNS( 'desc', 'svg' ) or node.tag == 'desc':
 				pass
 			elif node.tag == inkex.addNS( 'text', 'svg' ) or node.tag == 'text':
-				if not self.warnings.has_key( 'text' ):
-					inkex.errormsg( gettext.gettext( 'Warning: unable to draw text; ' +
-						'please convert it to a path first.  Consider using the ' +
-						'Hershey Text extension which is located under the '+
-						'"Render" category of extensions.' ) )
+				if (not self.warnings.has_key( 'text' )) and (self.plotCurrentLayer):
+					inkex.errormsg( gettext.gettext( 'Warning: Some elements omitted.\n' +
+						'Please convert text to a path before drawing, using ' +
+						'Path > Object to Path. Or, use the Hershey Text extension, '+
+						'which can be found under Extensions > Render.' ) )
 					self.warnings['text'] = 1
 				pass
 			elif node.tag == inkex.addNS( 'image', 'svg' ) or node.tag == 'image':
-				if not self.warnings.has_key( 'image' ):
-					inkex.errormsg( gettext.gettext( 'Warning: unable to draw bitmap images; ' +
-						'please convert them to line art first. Consider using the "Trace bitmap..." ' +
-						'tool of the "Path" menu.  Mac users please note that some X11 settings may ' +
-						'cause cut-and-paste operations to paste in bitmap copies.' ) )
+				if (not self.warnings.has_key( 'image' )) and (self.plotCurrentLayer):
+					inkex.errormsg( gettext.gettext( 'Warning: Some elements omitted.\n' +
+						'Please convert images to line art before drawing. ' +
+						' Consider using the Path > Trace bitmap tool. ' ) )
 					self.warnings['image'] = 1
 				pass
 			elif node.tag == inkex.addNS( 'pattern', 'svg' ) or node.tag == 'pattern':
@@ -1215,7 +1227,7 @@ class WCB( inkex.Effect ):
 				# be very useful.
 				pass
 			else:
-				if not self.warnings.has_key( str( node.tag ) ):
+				if (not self.warnings.has_key( str( node.tag ) )) and (self.plotCurrentLayer):
 					t = str( node.tag ).split( '}' )
 					inkex.errormsg( gettext.gettext( 'Warning: unable to draw <' + str( t[-1] ) +
 						'> object, please convert it to a path first.' ) )
@@ -1322,7 +1334,12 @@ class WCB( inkex.Effect ):
 					self.fX = float( csp[1][0] )    # Set move destination
 					self.fY = float( csp[1][1] )  
 					
-					self.plotLineAndTime(self.fX, self.fY )   #Draw a segment
+
+					if ( self.virtualPenIsUp ):		
+						self.penUpRapidMove( self.fX, self.fY ) #Rapid pen-up movements
+					else:
+						self.plotLineAndTime( self.fX, self.fY ) #Draw a segment
+
 						
 			if ( not self.bStopped ):	#an "index" for resuming plots quickly-- record last complete path
 				self.svgLastPath = self.pathcount #The number of the last path completed
@@ -1363,17 +1380,10 @@ class WCB( inkex.Effect ):
 		self.xErr = xTemp - float(nDeltaX)  # Keep track of rounding errors, so that they do not accumulate.
 		self.yErr = yTemp - float(nDeltaY)
 
-		if self.bPenIsUp:
-			self.fSpeed = self.BrushUpSpeed
-		else:
-			self.fSpeed = self.BrushDownSpeed
+		self.fSpeed = self.BrushDownSpeed
 
 		if ( plot_utils.distance( nDeltaX, nDeltaY ) > 0 ):
 			self.nodeCount += 1
-# 			inkex.errormsg( 'Nodecount: ' + str( self.nodeCount ) + '.' )
-# 			if (self.preResumeMove == True ):
-# 				inkex.errormsg( '--- at PreResume Move. ')
-
 
 			if self.resumeMode:
 				if ( self.nodeCount >= self.nodeTarget ):
@@ -1409,7 +1419,6 @@ class WCB( inkex.Effect ):
 					if ( td < 1 ):
 					   td = 1		# don't allow zero-time moves.
 
-							
 				if (not self.resumeMode) and (not self.bStopped):
 					if ( self.options.revMotor1 ):
 						xd2 = -xd
@@ -1447,6 +1456,213 @@ class WCB( inkex.Effect ):
 				self.bStopped = True
 				return
 					
+
+
+	def penUpRapidMove( self, xDest, yDest ):
+		'''
+		Like plotLineAndTime, but for use with a single straight line, with pen up.
+		Implement basic "trapezoid" acceleration and deceleration
+		'''
+
+		if (self.ignoreLimits == False):
+			xDest, xBounded = plot_utils.checkLimits( xDest, self.xBoundsMin, self.xBoundsMax )
+			yDest, yBounded = plot_utils.checkLimits( yDest, self.yBoundsMin, self.yBoundsMax )
+			if (xBounded or yBounded):
+				self.warnOutOfBounds = True
+
+		if self.bStopped:
+			return
+		if ( self.fCurrX is None ):
+			return
+		
+# 		Distances to move:
+		xMovementIdeal = self.stepsPerPx * ( xDest - self.fCurrX )	
+		yMovementIdeal = self.stepsPerPx * ( yDest - self.fCurrY )
+
+# 		Look at distance to move along 45-degree axes, for native motor steps:
+		motorSteps1 = int (round(xMovementIdeal)) # Number of native motor steps required, Axis 1
+		motorSteps2 = int (round(yMovementIdeal)) # Number of native motor steps required, Axis 2
+
+		plotDistance = plot_utils.distance( motorSteps1, motorSteps2 )
+		
+		if (plotDistance < 1.0): #if total movement is less than one step, skip this movement.
+			return
+
+		speedLimit = self.BrushUpSpeed
+		accelRate = self.BrushUpSpeed/1.0 	# acceleration/deceleration rate: Maximum speed/time to reach that speed
+											#TODO: Make this wcb_conf.ACCEL_TIME	
+		timeSlice = 0.050 	#(seconds): Slice travel into slices of time that are at least 0.050 seconds (50 ms) long
+
+		# Choose top speed by _estimating_ what it would be if we had continuous acceleration
+		#	
+		# Total travel distance is _plotDistance_
+		# Question: How fast can we get in half of this distance?
+		#     Set (plotDistance/2) equal to (1/2) * a * (tAccel)^2 , and solve for t_accel:
+		#     Then, t_accel = sqrt( plotDistance / a)
+		
+		tAccel = sqrt( plotDistance / accelRate)   #time interval for acceleration or deceleration
+		
+		if ( tAccel <= (3 * timeSlice )):
+			self.plotLineAndTime( xDest, yDest )	# Short move (less than three timeSlices): Use constant-velocity routine.
+			return
+
+		self.nodeCount += 1		# This whole rapid move counts as ONE node, for our purposes.
+		if self.resumeMode:
+			if ( self.nodeCount >= self.nodeTarget ):
+				self.resumeMode = False
+				if ( not self.virtualPenIsUp ):
+					self.penDown()	
+
+		# Declare arrays, all integers. 
+		# These are _normally_ 4-byte integers, but could (theoretically) be 2-byte integers on some systems.
+		#   if so, this could cause errors in rare cases (very large/long moves, etc.). 
+		# Set up an alert system, just in case!
+
+		durationArray = array('I') # unsigned integer for duration -- up to 65 seconds for a move if only 2 bytes.
+		distArray = array('f')	#float
+		destArray1 = array('i')	#signed integer
+		destArray2 = array('i')	#signed integer
+
+		if (destArray2.itemsize < 4):
+			self.warnDataSize = True
+
+		velocity = 0.0
+		timeElapsed = 0.0		
+		position = 0.0
+
+		# Speed _after_ acceleration interval:			
+		speedMax = accelRate * tAccel		
+		if ( speedMax > speedLimit ):
+			speedMax = speedLimit	# This move is longer than 2*tAccel; We will reach _full cruising speed_!
+			
+			intervals = int(math.floor(tAccel / timeSlice))	# Number of intervals each, during acceleration OR deceleration 
+			timePerInterval = tAccel / intervals			
+			#Add a center "cruising" speed interval if there is time for it only.
+			
+			velocityStepSize = speedMax/(intervals + 1.0)	
+			# For six time intervals of acceleration, first interval is at velocity (max/7)
+			# 6th (last) time interval is at 6*max/7
+			# after this interval, we are at full speed.
+			
+			for index in range(0, intervals):		#Calculate acceleration phase
+				velocity += velocityStepSize
+				timeElapsed += timePerInterval
+				position += velocity * timePerInterval
+				durationArray.append(int(round(timeElapsed * 1000.0)))
+				distArray.append(position)		#Estimated distance along direction of travel
+
+			coastingDistance = plotDistance - (2 * position)	
+			
+			if (coastingDistance > (timePerInterval * speedMax)):
+				# There is enough time for (at least) one interval at full cruising speed.
+				velocity = speedMax
+				cruisingTime = coastingDistance / velocity
+				timeElapsed += cruisingTime
+				durationArray.append(int(round(timeElapsed * 1000.0)))
+				position += velocity * cruisingTime
+				distArray.append(position)		#Estimated distance along direction of travel				
+# 				inkex.errormsg( 'FullSpeed duration: ' + str( cruisingTime ) )				
+# 				inkex.errormsg( 'FullSpeed distance: ' + str( velocity * cruisingTime ) )				
+
+			for index in range(0, intervals):		#Calculate deceleration phase
+				velocity -= velocityStepSize
+				timeElapsed += timePerInterval
+				position += velocity * timePerInterval
+				durationArray.append(int(round(timeElapsed * 1000.0)))
+				distArray.append(position)		#Estimated distance along direction of travel
+				
+		else:
+			# We will _not_ reach full cruising speed.
+			intervals = int(math.floor( 2 *	tAccel / timeSlice))	#TOTAL number of intervals, including acceleration and deceleration
+			if (intervals % 2 == 0):  # Even number of intervals:
+				intervals += 1	# Guarantee an odd number of intervals -- possibly a little shorter.
+				
+			timePerInterval = (2 * tAccel) / intervals
+
+			accelIntervals = int(math.ceil(intervals / 2.0))
+			velocityStepSize = speedMax / accelIntervals	
+
+			for index in range(0, accelIntervals):		#Calculate acceleration phase
+				velocity += velocityStepSize
+				timeElapsed += timePerInterval
+				position += velocity * timePerInterval
+				durationArray.append(int(round(timeElapsed * 1000.0)))
+				distArray.append(position)		#Estimated distance along direction of travel
+				
+			for index in range(0, intervals - accelIntervals):		#Calculate deceleration phase
+				velocity -= velocityStepSize
+				timeElapsed += timePerInterval
+				position += velocity * timePerInterval
+				durationArray.append(int(round(timeElapsed * 1000.0)))
+				distArray.append(position)		#Estimated distance along direction of travel
+
+		for index in range (0, len(distArray) ):
+			fractionalDistance = distArray[index] / position # Fractional position along the intended path
+			destArray1.append ( int(round( fractionalDistance * motorSteps1)))
+			destArray2.append ( int(round( fractionalDistance * motorSteps2)))
+
+		prevMotor1 = 0
+		prevMotor2 = 0
+		prevTime = 0
+		
+		for index in range (0, len(destArray1) ):
+			moveSteps1 = destArray1[index] - prevMotor1
+			moveSteps2 = destArray2[index] - prevMotor2
+			moveTime = durationArray[index] - prevTime
+			prevTime = durationArray[index]
+
+			
+			if ( moveTime < 1 ):
+				moveTime = 1		# don't allow zero-time moves.
+	
+			if (abs((float(moveSteps1) / float(moveTime))) < 0.002):	
+				moveSteps1 = 0		#don't allow too-slow movements of this axis
+			if (abs((float(moveSteps2) / float(moveTime))) < 0.002):	
+				moveSteps2 = 0		#don't allow too-slow movements of this axis
+	
+			prevMotor1 += moveSteps1
+			prevMotor2 += moveSteps2
+
+			xSteps = moveSteps1 # Result will be a float.
+			ySteps = moveSteps2	
+
+			if ((moveSteps1 != 0) or (moveSteps2 != 0)): # if at least one motor step is required for this move....
+	
+				if (not self.resumeMode) and (not self.bStopped):
+					if ( self.options.revMotor1 ):
+						moveSteps1Copy = -moveSteps1
+					else:
+						moveSteps1Copy = moveSteps1
+					if ( self.options.revMotor2):
+						moveSteps2Copy = -moveSteps2
+					else:
+						moveSteps2Copy = moveSteps2 
+					
+					ebb_motion.doXYMove( self.serialPort, moveSteps2Copy, moveSteps1Copy, moveTime )			
+					if (moveTime > 15):
+						if self.options.tab != '"manual"':
+							time.sleep(float(moveTime - 10)/1000.0)  #pause before issuing next command
+					else:
+						self.warnShortMoves = True
+
+					self.fCurrX += xSteps / self.stepsPerPx   # Update current position
+					self.fCurrY += ySteps / self.stepsPerPx		
+	
+					self.svgLastKnownPosX = self.fCurrX -  wcb_conf.F_StartPos_X
+					self.svgLastKnownPosY = self.fCurrY -  wcb_conf.F_StartPos_Y
+
+		strButton = ebb_motion.QueryPRGButton(self.serialPort)	#Query if button pressed
+		if strButton[0] == '1': #button pressed
+			self.svgNodeCount = self.nodeCount;
+			self.svgPausedPosX = self.fCurrX - wcb_conf.F_StartPos_X	#self.svgLastKnownPosX
+			self.svgPausedPosY = self.fCurrY - wcb_conf.F_StartPos_Y	#self.svgLastKnownPosY			
+			inkex.errormsg( 'Plot paused by button press after node number ' + str( self.nodeCount ) + '.' )
+			inkex.errormsg( 'Use the "resume" feature to continue.' )
+			self.bStopped = True
+			return
+
+
+
 
 	def EnableMotors( self ):
 		if ( self.options.resolution == 1 ):
