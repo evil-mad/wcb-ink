@@ -851,7 +851,11 @@ class WCB( inkex.Effect ):
 
 				self.penUp()
 				if ( node.get( inkex.addNS( 'groupmode', 'inkscape' ) ) == 'layer' ): 
-					self.DoWePlotLayer( node.get( inkex.addNS( 'label', 'inkscape' ) ) )
+					self.sCurrentLayerName = node.get( inkex.addNS( 'label', 'inkscape' ) )
+# 					self.DoWePlotLayer( node.get( inkex.addNS( 'label', 'inkscape' ) ) )
+					self.DoWePlotLayer( self.sCurrentLayerName )
+
+
 				self.recursivelyTraverseSvg( node, matNew, parent_visibility=v )			
 			
 			elif node.tag == inkex.addNS( 'use', 'svg' ) or node.tag == 'use':
@@ -1187,9 +1191,11 @@ class WCB( inkex.Effect ):
 				pass
 			elif node.tag == inkex.addNS( 'desc', 'svg' ) or node.tag == 'desc':
 				pass
-			elif node.tag == inkex.addNS( 'text', 'svg' ) or node.tag == 'text':
+			elif (node.tag == inkex.addNS( 'text', 'svg' ) or node.tag == 'text' or
+				node.tag == inkex.addNS( 'flowRoot', 'svg' ) or node.tag == 'flowRoot'):
 				if (not self.warnings.has_key( 'text' )) and (self.plotCurrentLayer):
-					inkex.errormsg( gettext.gettext( 'Warning: Some elements omitted.\n' +
+					inkex.errormsg( gettext.gettext( 'Warning: in layer "' + 
+						self.sCurrentLayerName + '" unable to draw text; ' +
 						'Please convert text to a path before drawing, using ' +
 						'Path > Object to Path. Or, use the Hershey Text extension, '+
 						'which can be found under Extensions > Render.' ) )
@@ -1197,7 +1203,8 @@ class WCB( inkex.Effect ):
 				pass
 			elif node.tag == inkex.addNS( 'image', 'svg' ) or node.tag == 'image':
 				if (not self.warnings.has_key( 'image' )) and (self.plotCurrentLayer):
-					inkex.errormsg( gettext.gettext( 'Warning: Some elements omitted.\n' +
+					inkex.errormsg( gettext.gettext( 'Warning: in layer "' + 
+						self.sCurrentLayerName + '" unable to draw bitmap images; ' +
 						'Please convert images to line art before drawing. ' +
 						' Consider using the Path > Trace bitmap tool. ' ) )
 					self.warnings['image'] = 1
@@ -1229,10 +1236,13 @@ class WCB( inkex.Effect ):
 			else:
 				if (not self.warnings.has_key( str( node.tag ) )) and (self.plotCurrentLayer):
 					t = str( node.tag ).split( '}' )
-					inkex.errormsg( gettext.gettext( 'Warning: unable to draw <' + str( t[-1] ) +
+					inkex.errormsg( gettext.gettext( 'Warning: in layer "' + 
+						self.sCurrentLayerName + '" unable to draw <' + str( t[-1] ) +
 						'> object, please convert it to a path first.' ) )
 					self.warnings[str( node.tag )] = 1
 				pass
+
+
 
 	def DoWePlotLayer( self, strLayerName ):
 		"""
