@@ -1713,7 +1713,7 @@ class WCB( inkex.Effect ):
 		if (self.bPenIsUp != False):  # skip if pen is already down
 			if ((not self.resumeMode) and ( not self.bStopped )): #skip if resuming or stopped
 				self.ServoSetMode()
-				ebb_motion.sendPenDown(self.serialPort, self.options.penUpDelay )						
+				ebb_motion.sendPenDown(self.serialPort, self.options.penDownDelay )						
 				self.bPenIsUp = False
 
 	def ServoSetupWrapper( self ):
