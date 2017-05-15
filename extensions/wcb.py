@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.4.0, dated 2016-02-20
+# Version 1.4.1, dated 2017-05-15
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
@@ -1045,7 +1045,7 @@ class WCB( inkex.Effect ):
 					
 					pa = pl.split()
 					if not len( pa ):
-						pass
+						continue
 					# Issue 29: pre 2.5.? versions of Python do not have
 					#    "statement-1 if expression-1 else statement-2"
 					# which came out of PEP 308, Conditional Expressions
@@ -1095,7 +1095,7 @@ class WCB( inkex.Effect ):
 					
 					pa = pl.split()
 					if not len( pa ):
-						pass
+						continue
 					# Issue 29: pre 2.5.? versions of Python do not have
 					#    "statement-1 if expression-1 else statement-2"
 					# which came out of PEP 308, Conditional Expressions
