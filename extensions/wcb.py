@@ -2,7 +2,7 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.4.1, dated 2017-05-15
+# Version 1.4.2, dated 2017-06-07
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
@@ -817,6 +817,8 @@ class WCB( inkex.Effect ):
 		paths in Inkscape.
 		"""
 		for node in aNodeList:
+			if self.bStopped:
+				return
 			# Ignore invisible nodes
 			v = node.get( 'visibility', parent_visibility )
 			if v == 'inherit':
