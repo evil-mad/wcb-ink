@@ -2,11 +2,11 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.4.2, dated 2017-06-07
+# Version 1.5.0, dated 2017-06-19
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
-# Copyright 2016 Windell H. Oskay, Evil Mad Scientist Laboratories
+# Copyright 2017 Windell H. Oskay, Evil Mad Scientist Laboratories
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -32,6 +32,7 @@
 
 # TODO: Advise user when no layers were found to plot-- from Paint tab
 
+import sys
 from simpletransform import *
 import gettext
 import simplepath
@@ -126,15 +127,7 @@ class WCB( inkex.Effect ):
 		self.OptionParser.add_option( "--smoothness",
 			action="store", type="float",
 			dest="smoothness", default=.2,
-			help="Smoothness of curves" ) 			
-# 		self.OptionParser.add_option( "--backlashX",
-# 			action="store", type="float",
-# 			dest="backlashX", default=0.0,
-# 			help="Backlash compensation, X direction" ) 					
-# 		self.OptionParser.add_option( "--backlashY",
-# 			action="store", type="float",
-# 			dest="backlashY", default=0.0,
-# 			help="Backlash compensation, Y direction" ) 			 
+			help="Smoothness of curves" ) 
 			
 		self.OptionParser.add_option( "--resolution",
 			action="store", type="int",
@@ -205,7 +198,12 @@ class WCB( inkex.Effect ):
 		self.LayersFoundToPlot = False
 		self.LayerPaintColor = -1
 		self.BrushColor = -1
-		
+
+		self.LayerOverrideSpeed = False
+		self.LayerOverridePenDownHeight = False
+		self.LayerPenDownPosition = -1
+		self.LayerPenDownSpeed = -1
+
 		#Values read from file:
 		self.svgLayer_Old = int( 0 )
 		self.svgNodeCount_Old = int( 0 )
@@ -227,11 +225,6 @@ class WCB( inkex.Effect ):
 		self.svgLastKnownPosY = float( 0.0 )
 		self.svgPausedPosX = float( 0.0 )
 		self.svgPausedPosY = float( 0.0 )	
-
-		self.backlashStepsX = int(0)
-		self.backlashStepsY = int(0)	 
-		self.XBacklashFlag = True
-		self.YBacklashFlag = True
 		
 		self.paintdist = 0.0
 		self.ReInkingNow = False
@@ -552,6 +545,7 @@ class WCB( inkex.Effect ):
 
 	def CleanBrush(self):  
 		self.CleaningNow = True
+		self.EnableMotors() #Set plotting resolution  
 		self.MoveToWater(0)
 		self.PaintSwirl(wcb_conf.WashCycles, wcb_conf.WashDelta[0], wcb_conf.WashDelta[1])   
 		self.MoveToWater(1)# 
@@ -559,6 +553,8 @@ class WCB( inkex.Effect ):
 		self.MoveToWater(2)	
 		self.PaintSwirl(wcb_conf.WashCycles, wcb_conf.WashDelta[0], wcb_conf.WashDelta[1])   
 		self.CleaningNow = False
+		self.EnableMotors() #Set plotting resolution  
+
 
 	def MoveDeltaXY(self,xDist,yDist):  
 		self.fX = self.fX + xDist   #Todo: Add limit checking?
@@ -589,6 +585,8 @@ class WCB( inkex.Effect ):
 	def PaintSwirl (self, swirlCount, Xpp, Ypp): # Xpp, Ypp: Peak-to-peak deviation in X and Y
 		TempInkingState = self.ReInkingNow
 		self.ReInkingNow = True   #Part of the "Re-inking" process, so override any desire to go get paint.
+		self.EnableMotors() #Set plotting speed to temporary pen-down speed.
+		self.ServoSetMode() #Set plotting height to temporary pen-down height for re-inking
 		self.penDown()  
 		self.MoveDeltaXY( 0, - Ypp / 2)
 		for _ in xrange(swirlCount): 
@@ -599,6 +597,8 @@ class WCB( inkex.Effect ):
 		self.MoveDeltaXY( 0, Ypp / 2)		 
  		self.penUp()  
  		self.ReInkingNow = TempInkingState
+		self.EnableMotors() # Set pen-down plotting speed back to original
+		self.ServoSetMode() # Set pen-down height  back to original
 
 
 	def MoveToPaint(self, dish):
@@ -691,8 +691,10 @@ class WCB( inkex.Effect ):
 							
 # 		self.MoveToXY(returnToX, returnToY)		#TODO: Add lead-in here
 		self.penUpRapidMove( returnToX, returnToY )
-		self.penDown() 
 		self.ReInkingNow = False
+		
+		self.EnableMotors() #Set plotting resolution back to normal after re-inking
+		self.penDown() 
 		self.paintdist = 0
 
 	def setPaintingMode(self):
@@ -1253,28 +1255,42 @@ class WCB( inkex.Effect ):
 			From the Paint tab,  if (autoChange is false) OR (layer number is 0-8)
 			From the Layers tab, if ((autoChange is false) OR (layer number is 0-8)) AND
 								  (layer name == (i.e., begins with) self.svgLayer). 
-			 
-		First: scan first 4 chars of node id for first non-numeric character,
-		and scan the part before that (if any) into a number
-		Then, see if the number matches the layer.
-		"""
 
+		Parse layer name for layer number and other properties.
+		
+		First: scan layer name for first non-numeric character,
+		and scan the part before that (if any) into a number
+		Then, (if not printing in all-layers mode)
+		see if the number matches the layer number that we are printing.
+		
+		Secondary function: Parse characters following the layer number (if any) to see if
+		there is a "+H" or "+S" escape code, that indicates that overrides the pen-down
+		height or speed for the given layer. We also check for the "%" leading character,
+		which indicates a layer that should be skipped.
+		"""
 		#self.options.autoChange
 		#inkex.errormsg('Plotting layer named: ' + node.get(inkex.addNS('label', 'inkscape'))) 
 
 		# Look at layer name.  Sample first character, then first two, and
 		# so on, until the string ends or the string no longer consists of digit characters only.
-		
 		TempNumString = 'x'
 		stringPos = 1	
 		layerNameInt = -1
 		layerMatch = False	
-		self.plotCurrentLayer = False    #Temporarily assume that we aren't plotting the layer
-		CurrentLayerName = string.lstrip( strLayerName ) #remove leading whitespace
+		if sys.version_info < (3,): #Yes this is ugly. More elegant suggestions welcome. :)
+			CurrentLayerName = strLayerName.encode( 'ascii', 'ignore' ) #Drop non-ascii characters	
+		else:
+			CurrentLayerName=str(strLayerName)		
+		CurrentLayerName.lstrip #remove leading whitespace
+		self.plotCurrentLayer = True    #Temporarily assume that we are plotting the layer
+
 		MaxLength = len( CurrentLayerName )
 		if MaxLength > 0:
+			if CurrentLayerName[0] == '%':
+				self.plotCurrentLayer = False	#First character is "%" -- skip this layer
 			while stringPos <= MaxLength:
-				if str.isdigit( CurrentLayerName[:stringPos] ):
+				LayerNameFragment = CurrentLayerName[:stringPos]
+				if (LayerNameFragment.isdigit()):
 					TempNumString = CurrentLayerName[:stringPos] # Store longest numeric string so far
 					stringPos = stringPos + 1
 				else:
@@ -1283,7 +1299,7 @@ class WCB( inkex.Effect ):
 		if ( str.isdigit( TempNumString ) ):
 			layerNameInt = int( float( TempNumString ) )
 			if ( self.svgLayer == layerNameInt ):
-				layerMatch = True	#Match! The current layer IS named in the Layers tab.
+				layerMatch = True	#Match! The current layer IS named.
 
 		if (self.options.autoChange == False) or (( layerNameInt >= 0) and (layerNameInt <= wcb_conf.N_Paint_Count )):
 			self.plotCurrentLayer = True
@@ -1294,6 +1310,60 @@ class WCB( inkex.Effect ):
 		if (self.plotCurrentLayer == True):
 			self.LayersFoundToPlot = True
 			self.LayerPaintColor = layerNameInt
+
+			#End of part 1, current layer to see if we print it.
+			#Now, check to see if there is additional information coded here.
+
+			oldPenDown = self.LayerPenDownPosition
+			oldSpeed = self.LayerPenDownSpeed
+				
+			#set default values before checking for any overrides:	
+			self.LayerOverridePenDownHeight = False
+			self.LayerOverrideSpeed = False
+			self.LayerPenDownPosition = -1
+			self.LayerPenDownSpeed = -1
+
+			if (stringPos > 0):
+				stringPos = stringPos - 1
+
+			if MaxLength > stringPos + 2:
+				while stringPos <= MaxLength:	
+					EscapeSequence = CurrentLayerName[stringPos:stringPos+2].lower()
+					if (EscapeSequence == "+h") or (EscapeSequence == "+s"):
+						paramStart = stringPos + 2
+						stringPos = stringPos + 3
+						TempNumString = 'x'
+						if MaxLength > 0:
+							while stringPos <= MaxLength:
+								if str.isdigit( CurrentLayerName[paramStart:stringPos] ):
+									TempNumString = CurrentLayerName[paramStart:stringPos] # Longest numeric string so far
+									stringPos = stringPos + 1
+								else:
+									break
+						if ( str.isdigit( TempNumString ) ):
+							parameterInt = int( float( TempNumString ) )
+					
+							if (EscapeSequence == "+h"):
+								if ((parameterInt >= 0) and (parameterInt <= 100)):
+									self.LayerOverridePenDownHeight = True
+									self.LayerPenDownPosition = parameterInt
+								
+							if (EscapeSequence == "+s"):
+								if ((parameterInt > 0) and (parameterInt <= 100)):
+									self.LayerOverrideSpeed = True
+									self.LayerPenDownSpeed = parameterInt
+									
+						stringPos = paramStart + len(TempNumString)
+					else:
+						break #exit loop. 
+			
+			if (self.LayerPenDownSpeed != oldSpeed):
+				self.EnableMotors()	#Set speed value variables for this layer.
+			if (self.LayerPenDownPosition != oldPenDown):
+				self.ServoSetup()	#Set pen height value variables for this layer.
+
+
+
 
 	def plotPath( self, path, matTransform ):
 		'''
@@ -1501,9 +1571,8 @@ class WCB( inkex.Effect ):
 			return
 
 		speedLimit = self.BrushUpSpeed
-		accelRate = self.BrushUpSpeed/1.0 	# acceleration/deceleration rate: Maximum speed/time to reach that speed
-											#TODO: Make this wcb_conf.ACCEL_TIME	
-		timeSlice = 0.050 	#(seconds): Slice travel into slices of time that are at least 0.050 seconds (50 ms) long
+		accelRate = self.BrushUpSpeed/wcb_conf.F_Accel_Factor	 # acceleration/deceleration rate: Maximum speed/time to reach that speed
+		timeSlice = 0.030 	#(seconds): Slice travel into slices of time that are at least 0.030 seconds (30 ms) long
 
 		# Choose top speed by _estimating_ what it would be if we had continuous acceleration
 		#	
@@ -1673,36 +1742,33 @@ class WCB( inkex.Effect ):
 			self.bStopped = True
 			return
 
-
-
-
 	def EnableMotors( self ):
+		# Enable motors, set native motor resolution, and set speed scales.
+
+		if ((self.CleaningNow == True) or (self.ReInkingNow == True)):
+			LocalPenDownSpeed = self.options.penDownSpeed
+		else:		
+			if (self.LayerOverrideSpeed):
+				LocalPenDownSpeed = self.LayerPenDownSpeed
+			else:	
+				LocalPenDownSpeed = self.options.penDownSpeed
+
 		if ( self.options.resolution == 1 ):
 			ebb_motion.sendEnableMotors(self.serialPort, 1) # 16X microstepping
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 90.0 )
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale
-			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale
+			self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale
 		elif ( self.options.resolution == 2 ):
 			ebb_motion.sendEnableMotors(self.serialPort, 2) # 8X microstepping
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 180.0 )  
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 2
-			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 2
+			self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale / 2
 		else:
 			ebb_motion.sendEnableMotors(self.serialPort, 3) # 4X microstepping  
 			self.stepsPerPx = float( wcb_conf.F_DPI_16X / 360.0 )
 			self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 4
-			self.BrushDownSpeed = self.options.penDownSpeed * wcb_conf.F_Speed_Scale / 4
+			self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale / 4
 		self.reInkDist = self.options.reInkDist * 90 * self.stepsPerPx # in motor steps
-
-		# Motor steps for backlash compensation:
-		# self.options.backlashX is in mils, need to calculate how many steps that is.
-		# self.options.backlashX * (1 inch/1000 mils) * (90 px/1 inch) * self.stepsPerPx
-		
-		#self.backlashStepsX = int( round(self.options.backlashX * (0.09 * self.stepsPerPx)))
-		#self.backlashStepsY = int( round(self.options.backlashY * (0.09 * self.stepsPerPx)))
-		
-# 		inkex.errormsg('self.backlashStepsX: ' + str(self.backlashStepsX)) 
-# 		inkex.errormsg('self.backlashStepsY: ' + str(self.backlashStepsY)) 
 
 	def penUp( self ):
 		self.virtualPenIsUp = True  # Virtual pen keeps track of state for resuming plotting.
@@ -1733,10 +1799,16 @@ class WCB( inkex.Effect ):
 		    a timing range of 7500 - 25000 in units of 1/(12 MHz).
 		    1% corresponds to ~14.6 us, or 175 units of 1/(12 MHz).
 		'''
+	
+		if (self.LayerOverridePenDownHeight):
+			penDownPos = self.LayerPenDownPosition
+		else:	
+			penDownPos = self.options.penDownPosition
+
 		intTemp = 7500 + 175 * self.options.penUpPosition
 		ebb_serial.command( self.serialPort,  'SC,4,' + str( intTemp ) + '\r' )	
 				
-		intTemp = 7500 + 175 * self.options.penDownPosition
+		intTemp = 7500 + 175 * penDownPos
 		ebb_serial.command( self.serialPort,  'SC,5,' + str( intTemp ) + '\r' )
 
 		''' Servo speed units are in units of %/second, referring to the
@@ -1750,12 +1822,20 @@ class WCB( inkex.Effect ):
 
 		intTemp = 4 * self.options.ServoDownSpeed
 		ebb_serial.command( self.serialPort,  'SC,12,' + str( intTemp ) + '\r' )
-		
+
+
 	def ServoSetMode (self):
+
 		if (self.CleaningNow):
-			intTemp = 7500 + 175 * self.options.penWashPosition
-		else:
-			intTemp = 7500 + 175 * self.options.penDownPosition
+			penDownPos = self.options.penWashPosition
+		elif (self.ReInkingNow == True):
+			penDownPos = self.options.penDownPosition
+		elif (self.LayerOverridePenDownHeight):
+			penDownPos = self.LayerPenDownPosition
+		else:	
+			penDownPos = self.options.penDownPosition
+		
+		intTemp = 7500 + 175 * penDownPos
 		ebb_serial.command( self.serialPort,  'SC,5,' + str( intTemp ) + '\r' )		
 
 	def stop( self ):

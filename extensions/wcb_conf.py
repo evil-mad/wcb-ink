@@ -1,6 +1,6 @@
 # wcb_conf.py
 # Part of the WaterColorBot driver for Inkscape
-# Version 1.2 , dated 2015-08-31
+# Version 1.5.0 , dated 2017-06-19
 #
 # https://github.com/oskay/watercolorbot/
 #
@@ -17,6 +17,7 @@ F_Speed_Scale = 40.0    #Default 100% speed, divided by 100. If value is 40 (def
 F_StartPos_X = -270.0   #parking position, in pixels. Default: -270 (-3 inches)
 F_StartPos_Y = 0.0      #parking position, in pixels. Default: 0
 
+F_Accel_Factor = .3      #Time, in seconds, to reach maximum speed, when using pen-up acceleration. Typ: 0.3 s
 
 '''
 WaterLoc: (X,Y) coordinates of center brush position in water dish, for each water dish.  
@@ -88,7 +89,3 @@ InkCycles = 1
 
 InkReCycles = 1
 InkReDelta = (50,35)
-
-
- 
-
