@@ -33,18 +33,29 @@
 # TODO: Advise user when no layers were found to plot-- from Paint tab
 
 import sys
-from simpletransform import *
 import gettext
-import simplepath
 import serial
 import string
 import time
 from math import sqrt
 from array import *
 
-import plot_utils		# https://github.com/evil-mad/plotink
-import ebb_serial		# https://github.com/evil-mad/plotink
-import ebb_motion		# https://github.com/evil-mad/plotink  Requires version 0.2
+from lxml import etree
+
+from plot_utils_import import from_dependency_import # plotink
+simplepath = from_dependency_import('ink_extensions.simplepath')
+cubicsuperpath = from_dependency_import('ink_extensions.cubicsuperpath')
+simpletransform = from_dependency_import('ink_extensions.simpletransform')
+inkex = from_dependency_import('ink_extensions.inkex')
+exit_status = from_dependency_import('ink_extensions_utils.exit_status')
+message = from_dependency_import('ink_extensions_utils.message')
+ebb_serial = from_dependency_import('plotink.ebb_serial')  # Requires v 0.13 in plotink    https://github.com/evil-mad/plotink
+ebb_motion = from_dependency_import('plotink.ebb_motion')  # Requires v 0.16 in plotink
+plot_utils = from_dependency_import('plotink.plot_utils')  # Requires v 0.15 in plotink
+
+
+
+
 
 import wcb_conf       	#Some settings can be changed here.
 
@@ -262,13 +273,13 @@ class WCB( inkex.Effect ):
 		useOldResumeData = True
 
 		skipSerial = False
-		if (self.options.tab == '"Help"'):
+		if (self.options.tab == "Help"):
 			skipSerial = True
- 		if (self.options.tab == '"options"'):
+ 		if (self.options.tab == "options"):
 			skipSerial = True 		
- 		if (self.options.tab == '"timing"'):
+ 		if (self.options.tab == "timing"):
 			skipSerial = True
-		if (self.options.tab == '"wcbModes"'):
+		if (self.options.tab == "wcbModes"):
 			skipSerial = True
  		
  		if skipSerial == False:
@@ -276,7 +287,7 @@ class WCB( inkex.Effect ):
  			if self.serialPort is None:
 				inkex.errormsg( gettext.gettext( "Failed to connect to WaterColorBot. :(" ) )
 		
-			if self.options.tab == '"splash"': 
+			if self.options.tab == "splash": 
 				self.LayersFoundToPlot = False
 				useOldResumeData = False
 				self.PrintFromLayersTab = False
@@ -293,7 +304,7 @@ class WCB( inkex.Effect ):
 						inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
 					
 				
-			elif self.options.tab == '"resume"':
+			elif self.options.tab == "resume":
 				if self.serialPort is None:
 					useOldResumeData = True
 				else:
@@ -329,7 +340,7 @@ class WCB( inkex.Effect ):
 					else:
 						inkex.errormsg( gettext.gettext( "There does not seem to be any in-progress plot to resume." ) )
 	
-			elif self.options.tab == '"layers"':
+			elif self.options.tab == "layers":
 				useOldResumeData = False 
 				self.PrintFromLayersTab = True
 				self.plotCurrentLayer = False
@@ -344,10 +355,10 @@ class WCB( inkex.Effect ):
 					if ( self.LayersFoundToPlot == False ):
 						inkex.errormsg( gettext.gettext( 'There are not any numbered layers to paint. Please use the "Snap Colors to Layers" extension, read about layer names in the documentation, or switch to a painting mode (like pen/pencil) that does not require numbered layers.' ) )
 	
-			elif self.options.tab == '"setup"':
+			elif self.options.tab == "setup":
 				self.setupCommand()
 				
-			elif self.options.tab == '"manual"':
+			elif self.options.tab == "manual":
 				if self.options.manualType == "strip-data":
 					for node in self.svg.xpath( '//svg:WCB', namespaces=inkex.NSS ):
 						self.svg.remove( node )
@@ -768,7 +779,7 @@ class WCB( inkex.Effect ):
 			if ( vinfo[2] != 0 ) and ( vinfo[3] != 0 ):
 				sx = self.svgWidth / float( vinfo[2] )
 				sy = self.svgHeight / float( vinfo[3] )
-				self.svgTransform = parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1])))
+				self.svgTransform = simpletransform.parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1])))
 
 		self.ServoSetup()
 		self.penUp() 
@@ -789,7 +800,7 @@ class WCB( inkex.Effect ):
 # 				self.plotLineAndTime(self.fX, self.fY )
 				self.penUpRapidMove( self.fX, self.fY ) #Rapid pen-up movements
 			if ( not self.bStopped ): 
-				if (self.options.tab == '"splash"') or (self.options.tab == '"layers"') or (self.options.tab == '"resume"'):
+				if (self.options.tab == "splash") or (self.options.tab == "layers") or (self.options.tab == "resume"):
 					self.svgLayer = 0
 					self.svgNodeCount = 0
 					self.svgLastPath = 0
@@ -829,7 +840,7 @@ class WCB( inkex.Effect ):
 				pass
 
 			# first apply the current matrix transform to this node's transform
-			matNew = composeTransform( matCurrent, parseTransform( node.get( "transform" ) ) )
+			matNew = simpletransform.composeTransform( matCurrent, simpletransform.parseTransform( node.get( "transform" ) ) )
 
 			if (node.getparent() == self.svg):
 				#Handle special case of Top-level object found
@@ -887,7 +898,7 @@ class WCB( inkex.Effect ):
 						y = float( node.get( 'y', '0' ) )
 						# Note: the transform has already been applied
 						if ( x != 0 ) or (y != 0 ):
-							matNew2 = composeTransform( matNew, parseTransform( 'translate(%f,%f)' % (x,y) ) )
+							matNew2 = simpletransform.composeTransform( matNew, simpletransform.parseTransform( 'translate(%f,%f)' % (x,y) ) )
 						else:
 							matNew2 = matNew
 						v = node.get( 'visibility', v )
@@ -1389,7 +1400,7 @@ class WCB( inkex.Effect ):
 			p = cubicsuperpath.parsePath( d )
 	
 			# ...and apply the transformation to each point
-			applyTransformToPath( matTransform, p )
+			simpletransform.applyTransformToPath( matTransform, p )
 	
 			# p is now a list of lists of cubic beziers [control pt1, control pt2, endpoint]
 			# where the start-point is the last point in the previous segment.
@@ -1721,7 +1732,7 @@ class WCB( inkex.Effect ):
 					
 					ebb_motion.doXYMove( self.serialPort, moveSteps2Copy, moveSteps1Copy, moveTime )			
 					if (moveTime > 15):
-						if self.options.tab != '"manual"':
+						if self.options.tab != "manual":
 							time.sleep(float(moveTime - 10)/1000.0)  #pause before issuing next command
 					else:
 						self.warnShortMoves = True
