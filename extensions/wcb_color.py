@@ -18,14 +18,24 @@
 # along with this program; if not, write to the Free Software
 # Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
 
-import inkex
-import simplestyle
+
+
 import random
 import math
 import string
 from copy import deepcopy
 
+from lxml import etree
 
+from plot_utils_import import from_dependency_import
+inkex = from_dependency_import('ink_extensions.inkex')
+simplestyle = from_dependency_import('ink_extensions.simplestyle')
+
+try:
+    xrange = xrange  # We have Python 2
+except NameError:
+    xrange = range  # We have Python 3
+    
 color_props_fill = ('fill', 'stop-color', 'flood-color', 'lighting-color')
 color_props_stroke = ('stroke',)
 color_props = color_props_stroke
@@ -42,7 +52,6 @@ crayola_classic_names = ["0-water wash", "1-black", "2-red", "3-orange", "4-yell
 
 
 class wcbColorSnap( inkex.Effect ):
-
 
     def __init__( self ):
         inkex.Effect.__init__( self )
@@ -64,7 +73,6 @@ class wcbColorSnap( inkex.Effect ):
         
         self.layersProcessed = []
         self.paletteRGB = crayola_classic    #in the future: Offer additional choices
-        
 
         for paintColor in self.paletteRGB: 
             c = simplestyle.parseColor(paintColor) 
@@ -180,7 +188,9 @@ class wcbColorSnap( inkex.Effect ):
             layerNameInt = -1 
             
             #Check to see if the layer name begins with a number in the range of palette colors
-            strLayerName = string.lstrip( strLayerName ) #remove leading whitespace
+            
+            strLayerName.lstrip() #remove leading whitespace
+            
             MaxLength = len( strLayerName )
             if MaxLength > 0:
                 while stringPos <= MaxLength:
@@ -250,7 +260,9 @@ class wcbColorSnap( inkex.Effect ):
                                 node.set('style', ';'.join(declarations))
                             if (self.snappedColor != -1):
                                 node.attrib["wcb-color-layer"] = str(self.snappedColor)
-                                
+
+            ####
+
                 
     def process_prop(self,col):
         #debug('got:'+col)
