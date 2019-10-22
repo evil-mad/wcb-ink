@@ -192,7 +192,6 @@ class WCB( inkex.Effect ):
             dest="layernumber", default=N_DEFAULT_LAYER,
             help="Selected layer for multilayer plotting" )            
             
-            
         self.serialPort = None
         self.bPenIsUp = None  #Initial state of pen is neither up nor down, but _unknown_.
         self.virtualPenIsUp = False  #Keeps track of pen postion when stepping through plot before resuming
@@ -275,6 +274,11 @@ class WCB( inkex.Effect ):
         self.CheckSVGforWCBData()
         useOldResumeData = True
 
+        self.options.tab = self.options.tab.strip("\"")
+        self.options.setupType = self.options.setupType.strip("\"")
+        self.options.manualType = self.options.manualType.strip("\"")
+        self.options.resumeType = self.options.resumeType.strip("\"")
+
         skipSerial = False
         if (self.options.tab == "Help"):
             skipSerial = True
@@ -286,10 +290,19 @@ class WCB( inkex.Effect ):
             skipSerial = True
         
         if skipSerial == False:
-            self.serialPort = ebb_serial.openPort()
+        
+            use_nickname = False
+            
+            if use_nickname:
+                named_port = "WaterColorBot" # "Hard-coded" USB nickname
+                the_port = ebb_serial.find_named_ebb(named_port)
+                self.serialPort = ebb_serial.testPort(the_port)
+            else:
+                self.serialPort = ebb_serial.openPort() # Open first-located EBB
+            
+            
             if self.serialPort is None:
                 inkex.errormsg( gettext.gettext( "Failed to connect to WaterColorBot. :(" ) )
-        
             if self.options.tab == "splash": 
                 self.LayersFoundToPlot = False
                 useOldResumeData = False
