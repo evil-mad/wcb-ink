@@ -1224,7 +1224,7 @@ class WCB( inkex.Effect ):
                 pass
             elif (node.tag == inkex.addNS( 'text', 'svg' ) or node.tag == 'text' or
                 node.tag == inkex.addNS( 'flowRoot', 'svg' ) or node.tag == 'flowRoot'):
-                if (not self.warnings.has_key( 'text' )) and (self.plotCurrentLayer):
+                if ('text' not in self.warnings) and (self.plotCurrentLayer):
                     inkex.errormsg( gettext.gettext( 'Warning: in layer "' + 
                         self.sCurrentLayerName + '" unable to draw text; ' +
                         'Please convert text to a path before drawing, using ' +
@@ -1233,7 +1233,7 @@ class WCB( inkex.Effect ):
                     self.warnings['text'] = 1
                 pass
             elif node.tag == inkex.addNS( 'image', 'svg' ) or node.tag == 'image':
-                if (not self.warnings.has_key( 'image' )) and (self.plotCurrentLayer):
+                if ('image' not in self.warnings) and (self.plotCurrentLayer):
                     inkex.errormsg( gettext.gettext( 'Warning: in layer "' + 
                         self.sCurrentLayerName + '" unable to draw bitmap images; ' +
                         'Please convert images to line art before drawing. ' +
@@ -1265,7 +1265,7 @@ class WCB( inkex.Effect ):
                 # be very useful.
                 pass
             else:
-                if (not self.warnings.has_key( str( node.tag ) )) and (self.plotCurrentLayer):
+                if (str( node.tag ) not in self.warnings and (self.plotCurrentLayer):
                     t = str( node.tag ).split( '}' )
                     inkex.errormsg( gettext.gettext( 'Warning: in layer "' + 
                         self.sCurrentLayerName + '" unable to draw <' + str( t[-1] ) +
