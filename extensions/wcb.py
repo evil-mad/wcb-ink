@@ -2,11 +2,11 @@
 # Part of the WaterColorBot driver for Inkscape
 # https://github.com/oskay/wcb-ink/
 #
-# Version 1.5.0, dated 2017-06-19
+# Version 1.6.0, dated 2020-10-08
 # 
 # Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
-# Copyright 2017 Windell H. Oskay, Evil Mad Scientist Laboratories
+# Copyright 2020 Windell H. Oskay, Evil Mad Scientist Laboratories
 #
 # This program is free software; you can redistribute it and/or modify
 # it under the terms of the GNU General Public License as published by
@@ -192,6 +192,7 @@ class WCB( inkex.Effect ):
             dest="layernumber", default=N_DEFAULT_LAYER,
             help="Selected layer for multilayer plotting" )            
             
+            
         self.serialPort = None
         self.bPenIsUp = None  #Initial state of pen is neither up nor down, but _unknown_.
         self.virtualPenIsUp = False  #Keeps track of pen postion when stepping through plot before resuming
@@ -258,7 +259,7 @@ class WCB( inkex.Effect ):
         
         self.svgTransform = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
         
-        self.stepsPerPx = float( wcb_conf.F_DPI_16X / 90.0 )  
+        self.stepsPerPx = float( wcb_conf.F_DPI_16X / 96.0 )  
         self.BrushUpSpeed   = float(wcb_conf.F_Speed_Scale) #speed when brush is up
         self.BrushDownSpeed = float(wcb_conf.F_Speed_Scale) #speed when brush is down        
                     
@@ -274,11 +275,6 @@ class WCB( inkex.Effect ):
         self.CheckSVGforWCBData()
         useOldResumeData = True
 
-        self.options.tab = self.options.tab.strip("\"")
-        self.options.setupType = self.options.setupType.strip("\"")
-        self.options.manualType = self.options.manualType.strip("\"")
-        self.options.resumeType = self.options.resumeType.strip("\"")
-
         skipSerial = False
         if (self.options.tab == "Help"):
             skipSerial = True
@@ -290,19 +286,10 @@ class WCB( inkex.Effect ):
             skipSerial = True
         
         if skipSerial == False:
-        
-            use_nickname = False
-            
-            if use_nickname:
-                named_port = "WaterColorBot" # "Hard-coded" USB nickname
-                the_port = ebb_serial.find_named_ebb(named_port)
-                self.serialPort = ebb_serial.testPort(the_port)
-            else:
-                self.serialPort = ebb_serial.openPort() # Open first-located EBB
-            
-            
+            self.serialPort = ebb_serial.openPort()
             if self.serialPort is None:
                 inkex.errormsg( gettext.gettext( "Failed to connect to WaterColorBot. :(" ) )
+        
             if self.options.tab == "splash": 
                 self.LayersFoundToPlot = False
                 useOldResumeData = False
@@ -564,8 +551,8 @@ class WCB( inkex.Effect ):
             self.fCurrX = self.svgLastKnownPosX_Old + wcb_conf.F_StartPos_X
             self.fCurrY = self.svgLastKnownPosY_Old + wcb_conf.F_StartPos_Y
             self.ignoreLimits = True
-            self.fX = self.fCurrX + nDeltaX * 90  #Note: Walking motors is STRICTLY RELATIVE TO INITIAL POSITION.
-            self.fY = self.fCurrY + nDeltaY * 90  
+            self.fX = self.fCurrX + nDeltaX * 96  #Note: Walking motors is STRICTLY RELATIVE TO INITIAL POSITION.
+            self.fY = self.fCurrY + nDeltaY * 96  
             self.plotLineAndTime(self.fX, self.fY ) 
 
 
@@ -1265,7 +1252,7 @@ class WCB( inkex.Effect ):
                 # be very useful.
                 pass
             else:
-                if (str( node.tag ) not in self.warnings and (self.plotCurrentLayer):
+                if (str( node.tag ) not in self.warnings) and (self.plotCurrentLayer):
                     t = str( node.tag ).split( '}' )
                     inkex.errormsg( gettext.gettext( 'Warning: in layer "' + 
                         self.sCurrentLayerName + '" unable to draw <' + str( t[-1] ) +
@@ -1782,20 +1769,20 @@ class WCB( inkex.Effect ):
 
         if ( self.options.resolution == 1 ):
             ebb_motion.sendEnableMotors(self.serialPort, 1) # 16X microstepping
-            self.stepsPerPx = float( wcb_conf.F_DPI_16X / 90.0 )
+            self.stepsPerPx = float( wcb_conf.F_DPI_16X / 96.0 )
             self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale
             self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale
         elif ( self.options.resolution == 2 ):
             ebb_motion.sendEnableMotors(self.serialPort, 2) # 8X microstepping
-            self.stepsPerPx = float( wcb_conf.F_DPI_16X / 180.0 )  
+            self.stepsPerPx = float( wcb_conf.F_DPI_16X / (2 * 96.0) )  
             self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 2
             self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale / 2
         else:
             ebb_motion.sendEnableMotors(self.serialPort, 3) # 4X microstepping  
-            self.stepsPerPx = float( wcb_conf.F_DPI_16X / 360.0 )
+            self.stepsPerPx = float( wcb_conf.F_DPI_16X / (4 * 96.0) )
             self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 4
             self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale / 4
-        self.reInkDist = self.options.reInkDist * 90 * self.stepsPerPx # in motor steps
+        self.reInkDist = self.options.reInkDist * 96 * self.stepsPerPx # in motor steps
 
     def penUp( self ):
         self.virtualPenIsUp = True  # Virtual pen keeps track of state for resuming plotting.
