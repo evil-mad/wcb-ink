@@ -249,17 +249,17 @@ class WCB( inkex.Effect ):
         self.xErr = 0.0
         self.yErr = 0.0
 
-        self.svgWidth = float( wcb_conf.N_PAGE_WIDTH )
-        self.svgHeight = float( wcb_conf.N_PAGE_HEIGHT ) 
+        self.svg_width = float( wcb_conf.N_PAGE_WIDTH )
+        self.svg_height = float( wcb_conf.N_PAGE_HEIGHT ) 
         
         self.xBoundsMax = wcb_conf.N_PAGE_WIDTH
         self.xBoundsMin = wcb_conf.F_StartPos_X
         self.yBoundsMax = wcb_conf.N_PAGE_HEIGHT
         self.yBoundsMin = wcb_conf.F_StartPos_Y        
         
-        self.svgTransform = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
+        self.svg_transform = [[1.0, 0.0, 0.0], [0.0, 1.0, 0.0]]
         
-        self.stepsPerPx = float( wcb_conf.F_DPI_16X / 96.0 )  
+        self.stepsPerPx = float( wcb_conf.F_DPI_16X / plot_utils.PX_PER_INCH )  
         self.BrushUpSpeed   = float(wcb_conf.F_Speed_Scale) #speed when brush is up
         self.BrushDownSpeed = float(wcb_conf.F_Speed_Scale) #speed when brush is down        
                     
@@ -551,8 +551,9 @@ class WCB( inkex.Effect ):
             self.fCurrX = self.svgLastKnownPosX_Old + wcb_conf.F_StartPos_X
             self.fCurrY = self.svgLastKnownPosY_Old + wcb_conf.F_StartPos_Y
             self.ignoreLimits = True
-            self.fX = self.fCurrX + nDeltaX * 96  #Note: Walking motors is STRICTLY RELATIVE TO INITIAL POSITION.
-            self.fY = self.fCurrY + nDeltaY * 96  
+            
+            self.fX = self.fCurrX + nDeltaX * plot_utils.PX_PER_INCH
+            self.fY = self.fCurrY + nDeltaY * plot_utils.PX_PER_INCH  
             self.plotLineAndTime(self.fX, self.fY ) 
 
 
@@ -776,13 +777,22 @@ class WCB( inkex.Effect ):
 #            
         # Viewbox handling
         # Also ignores the preserveAspectRatio attribute
-        viewbox = self.svg.get( 'viewBox' )
-        if viewbox:
-            vinfo = viewbox.strip().replace( ',', ' ' ).split( ' ' )
-            if ( vinfo[2] != 0 ) and ( vinfo[3] != 0 ):
-                sx = self.svgWidth / float( vinfo[2] )
-                sy = self.svgHeight / float( vinfo[3] )
-                self.svgTransform = simpletransform.parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1])))
+#         viewbox = self.svg.get( 'viewBox' )
+#         if viewbox:
+#             vinfo = viewbox.strip().replace( ',', ' ' ).split( ' ' )
+#             if ( vinfo[2] != 0 ) and ( vinfo[3] != 0 ):
+#                 sx = self.svg_width / float( vinfo[2] )
+#                 sy = self.svg_height / float( vinfo[3] )
+#                 self.svg_transform = simpletransform.parseTransform( 'scale(%f,%f) translate(%f,%f)' % (sx, sy, -float( vinfo[0] ), -float( vinfo[1])))
+
+        vb = self.svg.get('viewBox')
+        if vb:
+            p_a_r = self.svg.get('preserveAspectRatio')
+            sx, sy, ox, oy = plot_utils.vb_scale(vb, p_a_r, self.svg_width, self.svg_height)
+
+            # Initial transform of document is based on viewbox, if present:
+            self.svg_transform = simpletransform.parseTransform(\
+                    'scale({0:.6E},{1:.6E}) translate({2:.6E},{3:.6E})'.format(sx, sy, ox, oy))
 
         self.ServoSetup()
         self.penUp() 
@@ -790,7 +800,7 @@ class WCB( inkex.Effect ):
 
         try:
             # wrap everything in a try so we can for sure close the serial port 
-            self.recursivelyTraverseSvg( self.svg, self.svgTransform )
+            self.recursivelyTraverseSvg( self.svg, self.svg_transform )
             self.penUp()   #Always end with pen-up
  
             # return to home after end of normal plot
@@ -1404,7 +1414,7 @@ class WCB( inkex.Effect ):
     
             # ...and apply the transformation to each point
             simpletransform.applyTransformToPath( matTransform, p )
-    
+
             # p is now a list of lists of cubic beziers [control pt1, control pt2, endpoint]
             # where the start-point is the last point in the previous segment.
             for sp in p:
@@ -1769,20 +1779,21 @@ class WCB( inkex.Effect ):
 
         if ( self.options.resolution == 1 ):
             ebb_motion.sendEnableMotors(self.serialPort, 1) # 16X microstepping
-            self.stepsPerPx = float( wcb_conf.F_DPI_16X / 96.0 )
+            self.stepsPerPx = float( wcb_conf.F_DPI_16X / plot_utils.PX_PER_INCH)
             self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale
             self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale
         elif ( self.options.resolution == 2 ):
             ebb_motion.sendEnableMotors(self.serialPort, 2) # 8X microstepping
-            self.stepsPerPx = float( wcb_conf.F_DPI_16X / (2 * 96.0) )  
+            self.stepsPerPx = float( wcb_conf.F_DPI_16X / (2 * plot_utils.PX_PER_INCH) )  
             self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 2
             self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale / 2
         else:
             ebb_motion.sendEnableMotors(self.serialPort, 3) # 4X microstepping  
-            self.stepsPerPx = float( wcb_conf.F_DPI_16X / (4 * 96.0) )
+            self.stepsPerPx = float( wcb_conf.F_DPI_16X / (4 * plot_utils.PX_PER_INCH) )
             self.BrushUpSpeed   = self.options.penUpSpeed * wcb_conf.F_Speed_Scale / 4
             self.BrushDownSpeed = LocalPenDownSpeed * wcb_conf.F_Speed_Scale / 4
-        self.reInkDist = self.options.reInkDist * 96 * self.stepsPerPx # in motor steps
+        self.reInkDist = self.options.reInkDist * plot_utils.PX_PER_INCH * self.stepsPerPx
+        # in motor steps
 
     def penUp( self ):
         self.virtualPenIsUp = True  # Virtual pen keeps track of state for resuming plotting.
@@ -1861,9 +1872,10 @@ class WCB( inkex.Effect ):
         Use a default value in case the property is not present or is
         expressed in units of percentages.
         '''
-        self.svgHeight = plot_utils.getLength( self, 'height', float( wcb_conf.N_PAGE_HEIGHT )  )
-        self.svgWidth = plot_utils.getLength( self, 'width', float( wcb_conf.N_PAGE_WIDTH )  )
-        if ( self.svgHeight == None ) or ( self.svgWidth == None ):
+
+        self.svg_height = plot_utils.getLength( self, 'height', float( wcb_conf.N_PAGE_HEIGHT )  )
+        self.svg_width = plot_utils.getLength( self, 'width', float( wcb_conf.N_PAGE_WIDTH )  )
+        if ( self.svg_height == None ) or ( self.svg_width == None ):
             return False
         else:
             return True
