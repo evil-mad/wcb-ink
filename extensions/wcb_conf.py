@@ -11,7 +11,10 @@
 N_PAGE_HEIGHT = 768     # Default page height (each unit equiv. to one step), 8 inches
 N_PAGE_WIDTH = 1056     # Default page width (each unit equiv. to one step), 11 inches
 
-F_DPI_16X = 896.0       #DPI @ 16X microstepping.  Default: 896.  Used in converting drawing size to motor steps.
+#F_DPI_16X = 896.0       #DPI @ 16X microstepping.  Default: 896.  Used in converting drawing size to motor steps.
+
+F_DPI_16X = 2032       #DPI @ 16X microstepping for use on AxiDraw
+
 F_Speed_Scale = 40.0    #Default 100% speed, divided by 100. If value is 40 (default), 100% speed will be 4000 steps/s.
 
 F_StartPos_X = -288.0   #parking position, in pixels. Default: -3 inches
