@@ -1,71 +1,72 @@
 <?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
 <svg
+   xmlns:dc="http://purl.org/dc/elements/1.1/"
+   xmlns:cc="http://creativecommons.org/ns#"
+   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
+   xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
    xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
    xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
-   xmlns:xlink="http://www.w3.org/1999/xlink"
-   xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#"
-   xmlns:cc="http://web.resource.org/cc/"
-   xmlns:dc="http://purl.org/dc/elements/1.1/"
-   width="990px"
-   height="720px">
-  <defs />
+   inkscape:version="1.0 (4035a4f, 2020-05-01)"
+   width="279.39999mm"
+   height="203.2mm"
+   viewBox="0 0 279.4 203.20001"
+   version="1.1"
+   id="svg8">
+  <defs
+     id="defs2" />
   <sodipodi:namedview
-     inkscape:document-units="in"
-     pagecolor="#ffffff"
-     bordercolor="#666666"
-     borderopacity="1.0"
-     inkscape:pageopacity="0.0"
+     inkscape:window-maximized="0"
+     inkscape:window-y="23"
+     inkscape:window-x="0"
+     inkscape:window-height="943"
+     inkscape:window-width="1252"
+     units="mm"
+     showgrid="false"
+     inkscape:document-rotation="0"
+     inkscape:current-layer="layer1"
+     inkscape:document-units="mm"
+     inkscape:cy="560"
+     inkscape:cx="400"
+     inkscape:zoom="0.35"
      inkscape:pageshadow="2"
-     inkscape:zoom="0.22"
-     inkscape:cx="495"
-     inkscape:cy="360" 
-     inkscape:current-layer="layer1" />
-  <metadata>
+     inkscape:pageopacity="0.0"
+     borderopacity="1.0"
+     bordercolor="#666666"
+     pagecolor="#ffffff"
+     id="base" />
+  <metadata
+     id="metadata5">
     <rdf:RDF>
       <cc:Work
          rdf:about="">
         <dc:format>image/svg+xml</dc:format>
         <dc:type
            rdf:resource="http://purl.org/dc/dcmitype/StillImage" />
+        <dc:title></dc:title>
       </cc:Work>
     </rdf:RDF>
   </metadata>
   <g
-     inkscape:groupmode="layer"
-     id="layer4"
-     inkscape:label="4-Yellow" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer3"
-     inkscape:label="3-Orange" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer2"
-     inkscape:label="2-Red" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer5"
-     inkscape:label="5-Green" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer6"
-     inkscape:label="6-Blue" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer7"
-     inkscape:label="7-Violet" />
-  <g
-     inkscape:groupmode="layer"
-     id="layer8"
-     inkscape:label="8-Brown" />
-  <g
-     inkscape:groupmode="layer"
      id="layer1"
-     inkscape:label="1-Black" />
-  <g
      inkscape:groupmode="layer"
-     id="layer0"
-     inkscape:label="0-Water Wash" />
+     inkscape:label="Layer 1">
+    <rect
+       y="25"
+       x="100"
+       height="100"
+       width="100"
+       id="rect10"
+       style="fill:#ffffff;fill-opacity:0;stroke:#009400;stroke-width:0.499999;stroke-linecap:round;stroke-linejoin:round" />
+  </g>
+  <WCB
+     serialport=""
+     layer="0"
+     node="0"
+     lastpath="0"
+     lastpathnc="0"
+     lastknownposx="0"
+     lastknownposy="0"
+     pausedposx="0"
+     pausedposy="0" />
 </svg>
