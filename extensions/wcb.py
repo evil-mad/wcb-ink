@@ -3,8 +3,6 @@
 # https://github.com/oskay/wcb-ink/
 #
 # Version 1.6.0, dated 2020-10-08
-# 
-# Requires Pyserial 2.7.0 or newer. Pyserial 3.0 recommended.
 #
 # Copyright 2020 Windell H. Oskay, Evil Mad Scientist Laboratories
 #
@@ -34,7 +32,6 @@
 
 import sys
 import gettext
-import serial
 import string
 import time
 import math
