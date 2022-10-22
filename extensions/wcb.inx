@@ -4,7 +4,6 @@
   <id>command.evilmadscientist.wcb.plot_rev_57</id>
   <dependency type="extension">org.inkscape.output.svg.inkscape</dependency>
   <dependency type="executable" location="extensions">wcb.py</dependency>
-  <dependency type="executable" location="extensions">inkex.py</dependency>
   <param name="tab" type="notebook">
   
     <page name="splash" _gui-text="Paint">
