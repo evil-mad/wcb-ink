@@ -1,36 +1,35 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <_name>Snap Colors to Layers</_name>
+  <name>Snap Colors to Layers</name>
   <id>command.evilmadscientist.wcb.snap_reva4</id>
 
  <param name="tab" type="notebook">
-    <page name="splash" _gui-text="Snap Colors">
+    <page name="splash" gui-text="Snap Colors">
 
 
-        
-<_param name="aboutpage" type="description" xml:space="preserve">
+<label xml:space="preserve">
 This extension "snaps" objects in the document into
 a standard color palette by their stroke color, and
 optionally moves them into numbered layers.
 
 This is experimental software. Please save your
 document before using. :)
-</_param>
+</label>
 
-	      <param name="snapLayers" type="boolean"
-	           _gui-text="Move objects to numbered layers*">true</param> 
+    <param name="snapLayers" type="bool"
+        gui-text="Move objects to numbered layers*">true</param>
 
-<_param name="aboutpage2" type="description" xml:space="preserve">
+<label xml:space="preserve">
 * IMPORTANT NOTE:
 Before you use the use the "Move objects to 
 numbered layers" option, you must first 
 ungroup all objects in your document. 
-        </_param>
+</label>
 
 
  </page>
-    <page name="info" _gui-text="More Info">
-	     <_param name="aboutpage3" type="description" xml:space="preserve">
+    <page name="info" gui-text="More Info">
+	     <label xml:space="preserve">
 If "Move objects to numbered layers" is 
 selected, it will also move objects into 
 separate layers, organized by their colors,
@@ -44,9 +43,9 @@ To do so, select:
   Menu Bar > Object > Ungroup
 
 In some cases, you may need to Ungroup repeatedly.
-</_param>    </page>
-    <page name="info2" _gui-text="Even More Info...">
-	     <_param name="aboutpage4" type="description" xml:space="preserve">
+</label>    </page>
+    <page name="info2" gui-text="Even More Info...">
+     <label xml:space="preserve">
 The standard color palette consists of:
 Black, Red, Orange, Yellow, Green, Blue,
 Violet, and Brown. 
@@ -59,19 +58,19 @@ http://watercolorbot.com/docs
 
 
 Pro-tip: Use the Live Preview option below!
-</_param>
+</label>
 
 
     </page>
   </param>
 
-  <effect needs-live-preview="true" needs-document="no">
+  <effect needs-live-preview="true" needs-document="true">
     <object-type>all</object-type>
 	<effects-menu>
-		<submenu _name="WaterColorBot"/>
+		<submenu name="WaterColorBot"/>
 	</effects-menu>
   </effect>
     <script>
-        <command reldir="extensions" interpreter="python">wcb_color.py</command>
+        <command location="extensions" interpreter="python">wcb_color.py</command>
     </script>
 </inkscape-extension>
