@@ -1,9 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <inkscape-extension xmlns="http://www.inkscape.org/namespace/inkscape/extension">
-  <_name>Snap Colors to Layers (beta)</_name>
+  <_name>Snap Colors to Layers</_name>
   <id>command.evilmadscientist.wcb.snap_reva4</id>
-
-	<dependency type="executable" location="extensions">inkex.py</dependency>
 
  <param name="tab" type="notebook">
     <page name="splash" _gui-text="Snap Colors">
@@ -11,11 +9,11 @@
 
         
 <_param name="aboutpage" type="description" xml:space="preserve">
-This extension "snaps" objects in the document
-into a standard color palette, and optionally
-moves them into numbered layers.
+This extension "snaps" objects in the document into
+a standard color palette by their stroke color, and
+optionally moves them into numbered layers.
 
-This is beta software. Please save your
+This is experimental software. Please save your
 document before using. :)
 </_param>
 
