@@ -74,118 +74,118 @@ class WCB( inkex.Effect ):
 
     def __init__( self ):
         inkex.Effect.__init__( self )
-        self.OptionParser.add_option( "--tab",
-            action="store", type="string",
+        self.arg_parser.add_argument( "--tab",
+            action="store", type=str,
             dest="tab", default="controls",
             help="The active tab when Apply was pressed" )
             
-        self.OptionParser.add_option( "--penUpPosition",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--penUpPosition",
+            action="store", type=int,
             dest="penUpPosition", default=N_PEN_UP_POS,
             help="Position of pen when lifted" )
-        self.OptionParser.add_option( "--penDownPosition",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--penDownPosition",
+            action="store", type=int,
             dest="penDownPosition", default=N_PEN_DOWN_POS,
             help="Position of pen for painting" )
-        self.OptionParser.add_option( "--penWashPosition",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--penWashPosition",
+            action="store", type=int,
             dest="penWashPosition", default=N_PEN_WASH_POS,
             help="Position of pen for washing" )            
              
-        self.OptionParser.add_option( "--setupType",
-            action="store", type="string",
+        self.arg_parser.add_argument( "--setupType",
+            action="store", type=str,
             dest="setupType", default="controls",
             help="The active option when Apply was pressed" )
             
-        self.OptionParser.add_option( "--penDownSpeed",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--penDownSpeed",
+            action="store", type=int,
             dest="penDownSpeed", default=F_DEFAULT_SPEED,
             help="Speed (step/sec) while pen is down." )
-        self.OptionParser.add_option( "--penUpSpeed",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--penUpSpeed",
+            action="store", type=int,
             dest="penUpSpeed", default=F_DEFAULT_SPEED,
             help="Speed (step/sec) while pen is up." )
-        self.OptionParser.add_option( "--ServoUpSpeed",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--ServoUpSpeed",
+            action="store", type=int,
             dest="ServoUpSpeed", default=N_SERVOSPEED,
             help="Rate of lifting pen " )
-        self.OptionParser.add_option( "--penUpDelay",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--penUpDelay",
+            action="store", type=int,
             dest="penUpDelay", default=N_PEN_UP_DELAY,
             help="Delay after pen up (msec)." )
-        self.OptionParser.add_option( "--ServoDownSpeed",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--ServoDownSpeed",
+            action="store", type=int,
             dest="ServoDownSpeed", default=N_SERVOSPEED,
             help="Rate of lowering pen " ) 
-        self.OptionParser.add_option( "--penDownDelay",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--penDownDelay",
+            action="store", type=int,
             dest="penDownDelay", default=N_PEN_DOWN_DELAY,
             help="Delay after pen down (msec)." )
             
-        self.OptionParser.add_option( "--revMotor1",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--revMotor1",
+            action="store", type=inkex.boolean_option,
             dest="revMotor1", default=False,
             help="Reverse motion of X motor." )
-        self.OptionParser.add_option( "--revMotor2",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--revMotor2",
+            action="store", type=inkex.boolean_option,
             dest="revMotor2", default=False,
             help="Reverse motion of Y motor." )
-        self.OptionParser.add_option( "--reInkDist",
-            action="store", type="float",
+        self.arg_parser.add_argument( "--reInkDist",
+            action="store", type=float,
             dest="reInkDist", default=10,
             help="Re-ink distance (inches)" ) 
             
-        self.OptionParser.add_option( "--smoothness",
-            action="store", type="float",
+        self.arg_parser.add_argument( "--smoothness",
+            action="store", type=float,
             dest="smoothness", default=.2,
             help="Smoothness of curves" ) 
             
-        self.OptionParser.add_option( "--resolution",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--resolution",
+            action="store", type=int,
             dest="resolution", default=3,
             help="Resolution factor." )    
             
-        self.OptionParser.add_option( "--paintMode",
-            action="store", type="string",
+        self.arg_parser.add_argument( "--paintMode",
+            action="store", type=str,
             dest="paintMode", default="controls",
             help="The painting mode when Apply was pressed" )
-        self.OptionParser.add_option( "--autoChange",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--autoChange",
+            action="store", type=inkex.boolean_option,
             dest="autoChange", default=False,
             help="[AutoChange] between colors w/ water wash" )                    
-        self.OptionParser.add_option( "--reInkEnable",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--reInkEnable",
+            action="store", type=inkex.boolean_option,
             dest="reInkEnable", default=False,
             help="[Re-Ink] brush after given distance (yes/no)." )            
-        self.OptionParser.add_option( "--ReWetOnly",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--ReWetOnly",
+            action="store", type=inkex.boolean_option,
             dest="ReWetOnly", default=False,
             help="[Re-Wet] brush after given distance (no ink)." )            
-        self.OptionParser.add_option( "--PreDipEnable",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--PreDipEnable",
+            action="store", type=inkex.boolean_option,
             dest="PreDipEnable", default=False,
             help="[Pre-Dip] brush in water before re-inking." )            
-        self.OptionParser.add_option( "--PostDipEnable",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--PostDipEnable",
+            action="store", type=inkex.boolean_option,
             dest="PostDipEnable", default=False,
             help="[Post-Dip] brush in water after re-inking." )                    
             
-        self.OptionParser.add_option( "--manualType",
-            action="store", type="string",
+        self.arg_parser.add_argument( "--manualType",
+            action="store", type=str,
             dest="manualType", default="controls",
             help="The active option when Apply was pressed" )
-        self.OptionParser.add_option( "--WalkDistance",
-            action="store", type="float",
+        self.arg_parser.add_argument( "--WalkDistance",
+            action="store", type=float,
             dest="WalkDistance", default=1,
             help="Distance for manual walk" )            
             
-        self.OptionParser.add_option( "--resumeType",
-            action="store", type="string",
+        self.arg_parser.add_argument( "--resumeType",
+            action="store", type=str,
             dest="resumeType", default="controls",
             help="The active option when Apply was pressed" )            
             
-        self.OptionParser.add_option( "--layernumber",
-            action="store", type="int",
+        self.arg_parser.add_argument( "--layernumber",
+            action="store", type=int,
             dest="layernumber", default=N_DEFAULT_LAYER,
             help="Selected layer for multilayer plotting" )            
             
