@@ -55,12 +55,12 @@ class wcbColorSnap( inkex.Effect ):
 
     def __init__( self ):
         inkex.Effect.__init__( self )
-        self.OptionParser.add_option( "--tab",    #NOTE: value is not used for anything. :P
-            action="store", type="string",
+        self.arg_parser.add_argument( "--tab",    #NOTE: value is not used for anything. :P
+            action="store", type=str,
             dest="tab", default="splash",
             help="The active tab when Apply was pressed" )
-        self.OptionParser.add_option( "--snapLayers",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--snapLayers",
+            action="store", type=inkex.boolean_option,
             dest="snapLayers", default=False,
             help="Move colors to layers." )
         self.paletteRGB = []
