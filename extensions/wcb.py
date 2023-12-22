@@ -1251,13 +1251,17 @@ class WCB( inkex.Effect ):
             elif node.tag == inkex.addNS( 'color-profile', 'svg' ) or node.tag == 'color-profile':
                 # Gamma curves, color temp, etc. are not relevant to single color output
                 pass
-            elif not isinstance( node.tag, basestring ):
-                # This is likely an XML processing instruction such as an XML
-                # comment.  lxml uses a function reference for such node tags
-                # and as such the node tag is likely not a printable string.
-                # Further, converting it to a printable string likely won't
-                # be very useful.
+            elif node.tag == inkex.addNS( 'color-profile', 'svg' ) or node.tag == 'color-profile':
+                # Gamma curves, color temp, etc. are not relevant to single color output
                 pass
+            elif node.tag == etree.Comment:
+                continue
+            elif not isinstance(node.tag, str):
+                # This is likely an XML processing instruction such as an XML
+                # comment. lxml uses a function reference for such node tags
+                # and as such the node tag is likely not a printable string.
+                # Converting it to a printable string likely won't be useful.
+                continue
             else:
                 if (str( node.tag ) not in self.warnings) and (self.plotCurrentLayer):
                     t = str( node.tag ).split( '}' )
