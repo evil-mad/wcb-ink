@@ -210,8 +210,9 @@ Layer 1: Top color.  Layer 8: Bottom color.
 
     <page name="Help" gui-text="*">
       <label xml:space="preserve">
-Control WaterColorBot Inkscape extension 
-Release 1.6.0, dated 2020-10-08
+Control WaterColorBot Inkscape extension
+Special version for AxiDraw hardware 
+Release 1.6.1, dated 2023-12-21
 
 http://watercolorbot.com/docs
 
@@ -224,7 +225,6 @@ https://github.com/evil-mad/wcb-ink/issues
 Known issues:
 * "Cancel" function does not work while plotting.
   (This is due to a known bug in Inkscape.)
-
 </label>
     </page>
   </param>

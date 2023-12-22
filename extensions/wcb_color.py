@@ -55,12 +55,12 @@ class wcbColorSnap( inkex.Effect ):
 
     def __init__( self ):
         inkex.Effect.__init__( self )
-        self.OptionParser.add_option( "--tab",    #NOTE: value is not used for anything. :P
-            action="store", type="string",
+        self.arg_parser.add_argument( "--tab",    #NOTE: value is not used for anything. :P
+            action="store", type=str,
             dest="tab", default="splash",
             help="The active tab when Apply was pressed" )
-        self.OptionParser.add_option( "--snapLayers",
-            action="store", type="inkbool",
+        self.arg_parser.add_argument( "--snapLayers",
+            action="store", type=inkex.boolean_option,
             dest="snapLayers", default=False,
             help="Move colors to layers." )
         self.paletteRGB = []
@@ -80,7 +80,7 @@ class wcbColorSnap( inkex.Effect ):
             self.layerLabels.append("layerNotFound")
             
         self.scanForLayerNames(self.document.getroot())    #Recursively scan through document for named layers.
-#           inkex.errormsg('layerLabels: ' + str(self.layerLabels)) 
+        # inkex.errormsg('layerLabels: ' + str(self.layerLabels)) 
 
         self.getAttribs(self.document.getroot())    #Recursively scan through file, snap & label things that have color attributes.
 
@@ -90,34 +90,26 @@ class wcbColorSnap( inkex.Effect ):
         if (self.options.snapLayers):
             #Now, walk through the palette, adding any new named layers that are needed
             for i in xrange(len(self.paletteRGB)):
-                if (self.layerLabels[i] == "layerNotFound"):    
-            
+                if (self.layerLabels[i] == "layerNotFound"):
                     # Create a group <g> element under the document root
                     layer = inkex.etree.SubElement( self.document.getroot(), inkex.addNS( 'g', 'svg' ) )
-        
                     # Add Inkscape layer attributes to this new group
                     layer.set( inkex.addNS('groupmode', 'inkscape' ), 'layer' )
                     layer.set( inkex.addNS( 'label', 'inkscape' ), crayola_classic_names[i] )
                     self.layerLabels[i] = crayola_classic_names[i]
 
             for child in self.document.getroot():
-#                 inkex.errormsg('wcb-color-layer: ' + str(child.get('wcb-color-layer'))) 
                 if ( child.get( inkex.addNS( 'groupmode', 'inkscape' ) ) == 'layer' ):         #if it's a layer...    
                     strLayerNameTmp = str(child.get(inkex.addNS( 'label', 'inkscape' )))
-#                      inkex.errormsg('Layer Name: ' + strLayerNameTmp)
                     if (strLayerNameTmp in self.layerLabels):
                         #this is one of the named layers that we're using.
                         layerNumberInt = self.layerLabels.index(strLayerNameTmp)
                         if not (strLayerNameTmp in self.layersProcessed):
                             self.layersProcessed.append(strLayerNameTmp)
-#                               inkex.errormsg('Processed Layer Name: ' + strLayerNameTmp)
                             self.MoveColoredNodes(self.document.getroot(), child, layerNumberInt)
 
 
-
-
-
-    def MoveColoredNodes(self,node,destination,layerNoInt):                
+    def MoveColoredNodes(self,node,destination,layerNoInt):
         val = node.get('wcb-color-layer')
         if val:
             if (int(val) == layerNoInt):
@@ -223,11 +215,9 @@ class wcbColorSnap( inkex.Effect ):
                     node.set(attr, new_val) 
                 if (self.snappedColor != -1):
                     node.attrib["wcb-color-layer"] = str(self.snappedColor)
-                    
 
-        
 
-        if node.attrib.has_key('style'):
+        if 'style' in node.attrib:
             # References for style attribute:
             # http://www.w3.org/TR/SVG11/styling.html#StyleAttribute,
             # http://www.w3.org/TR/CSS21/syndata.html
