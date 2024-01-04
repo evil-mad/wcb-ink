@@ -1536,7 +1536,10 @@ class WCB( inkex.Effect ):
                     else:
                         yd2 = yd 
                         
-                    strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!  WaterColorBot
+#                     strOutput = ','.join( ['SM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!  WaterColorBot
+
+                    # Change for use with AxiDraw
+                    strOutput = ','.join( ['xM', str( td ), str( xd2 ), str( yd2 )] ) + '\r' #Move the motors!  WaterColorBot
 
                     ebb_serial.command( self.serialPort, strOutput )        
                     self.fCurrX += xd / self.stepsPerPx   # Update current position
@@ -1744,7 +1747,11 @@ class WCB( inkex.Effect ):
                     else:
                         moveSteps2Copy = moveSteps2 
                     
-                    ebb_motion.doXYMove( self.serialPort, moveSteps2Copy, moveSteps1Copy, moveTime )            
+#                     ebb_motion.doXYMove( self.serialPort, moveSteps2Copy, moveSteps1Copy, moveTime )            
+
+                    # Change for use with AxiDraw
+                    ebb_motion.doABMove( self.serialPort, moveSteps1Copy, moveSteps2Copy, moveTime )            
+
                     if (moveTime > 15):
                         if self.options.tab != "manual":
                             time.sleep(float(moveTime - 10)/1000.0)  #pause before issuing next command
